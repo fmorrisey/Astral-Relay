@@ -6,3 +6,4 @@ data/*.db-wal
 npm-debug.log
 *.log
 .DS_Store
+.claude/commands/fix-review.md
