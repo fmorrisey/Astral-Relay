@@ -1,5 +1,4 @@
-import { html, render } from 'https://esm.sh/htm/preact/standalone';
-import { useState, useEffect } from 'https://esm.sh/preact/hooks';
+import { html, render, useState, useEffect } from 'https://esm.sh/htm/preact/standalone';
 import { api } from './lib/api.js';
 import { Header } from './components/Header.js';
 import { LoginForm } from './components/LoginForm.js';

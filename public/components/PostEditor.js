@@ -1,5 +1,4 @@
-import { html } from 'https://esm.sh/htm/preact/standalone';
-import { useState, useEffect, useRef } from 'https://esm.sh/preact/hooks';
+import { html, useState, useEffect, useRef } from 'https://esm.sh/htm/preact/standalone';
 import { api } from '../lib/api.js';
 
 export function PostEditor({ postId }) {
@@ -10,6 +9,7 @@ export function PostEditor({ postId }) {
     summary: '',
     tags: []
   });
+  const [collections, setCollections] = useState(['blog']);
   const [tagInput, setTagInput] = useState('');
   const [loading, setLoading] = useState(!!postId);
   const [saving, setSaving] = useState(false);
@@ -18,6 +18,7 @@ export function PostEditor({ postId }) {
   const isNew = !postId;
 
   useEffect(() => {
+    loadCollections();
     if (postId) {
       loadPost();
     }
@@ -25,6 +26,18 @@ export function PostEditor({ postId }) {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
   }, [postId]);
+
+  async function loadCollections() {
+    try {
+      const data = await api.getCollections();
+      setCollections(data.collections);
+      if (!postId && data.collections.length > 0) {
+        setPost(prev => ({ ...prev, collection: data.collections[0] }));
+      }
+    } catch (err) {
+      console.error('Failed to load collections:', err);
+    }
+  }
 
   async function loadPost() {
     try {
@@ -145,10 +158,9 @@ export function PostEditor({ postId }) {
           onInput=${(e) => handleChange('collection', e.target.value)}
           disabled=${!isNew}
         >
-          <option value="blog">Blog</option>
-          <option value="photos">Photos</option>
-          <option value="adventures">Adventures</option>
-          <option value="portfolio">Portfolio</option>
+          ${collections.map(col => html`
+            <option key=${col} value=${col}>${col.charAt(0).toUpperCase() + col.slice(1)}</option>
+          `)}
         </select>
       </div>
 

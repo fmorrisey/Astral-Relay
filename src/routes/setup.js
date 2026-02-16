@@ -18,6 +18,16 @@ export default async function setupRoutes(fastify) {
     };
   });
 
+  // Get collections
+  fastify.get('/api/setup/collections', async () => {
+    const result = fastify.db
+      .prepare("SELECT value FROM config WHERE key = 'collections'")
+      .get();
+
+    const collections = result?.value ? JSON.parse(result.value) : ['blog'];
+    return { collections };
+  });
+
   // Validate workspace
   fastify.post('/api/setup/validate', async (request, reply) => {
     const { workspacePath } = request.body || {};

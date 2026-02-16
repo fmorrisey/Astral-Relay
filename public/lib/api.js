@@ -25,6 +25,7 @@ export const api = {
   me: () => api.request('/auth/me'),
   setup: (data) => api.request('/auth/setup', { method: 'POST', body: JSON.stringify(data) }),
   setupStatus: () => api.request('/setup/status'),
+  getCollections: () => api.request('/setup/collections'),
 
   // Posts
   getPosts: (params = {}) => api.request(`/posts?${new URLSearchParams(params)}`),

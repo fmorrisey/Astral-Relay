@@ -1,5 +1,4 @@
-import { html } from 'https://esm.sh/htm/preact/standalone';
-import { useState, useEffect, useRef } from 'https://esm.sh/preact/hooks';
+import { html, useState, useEffect, useRef } from 'https://esm.sh/htm/preact/standalone';
 import { api } from '../lib/api.js';
 
 export function MediaUploader() {

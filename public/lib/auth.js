@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'https://esm.sh/preact/hooks';
+import { useState, useEffect } from 'https://esm.sh/htm/preact/standalone';
 import { api } from './api.js';
 
 export function useAuth() {

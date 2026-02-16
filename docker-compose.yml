@@ -3,14 +3,14 @@ services:
     build: .
     container_name: astral-relay
     ports:
-      - "3030:3030"
+      - "3031:3031"
     volumes:
       - ./data:/app/data
       # UPDATE THIS PATH to your Astro site
       # - /path/to/your/astro-site:/workspace
     environment:
       - NODE_ENV=production
-      - PORT=3030
+      - PORT=3031
       - DB_PATH=/app/data/relay.db
       - WORKSPACE_PATH=/workspace
       - SESSION_SECRET=${SESSION_SECRET:-change-me-to-a-random-secret}

@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto';
 
 const config = {
   env: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '3030', 10),
+  port: parseInt(process.env.PORT || '3031', 10),
   host: process.env.HOST || '0.0.0.0',
 
   dbPath: process.env.DB_PATH || './data/relay.db',

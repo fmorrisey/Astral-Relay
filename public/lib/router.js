@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'https://esm.sh/preact/hooks';
+import { useState, useEffect } from 'https://esm.sh/htm/preact/standalone';
 
 export function useRouter() {
   const [route, setRoute] = useState(window.location.hash || '#/');
