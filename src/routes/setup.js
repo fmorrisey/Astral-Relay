@@ -24,7 +24,16 @@ export default async function setupRoutes(fastify) {
       .prepare("SELECT value FROM config WHERE key = 'collections'")
       .get();
 
-    const collections = result?.value ? JSON.parse(result.value) : ['blog'];
+    let collections;
+    if (result?.value) {
+      try {
+        collections = JSON.parse(result.value);
+      } catch (error) {
+        collections = ['blog'];
+      }
+    } else {
+      collections = ['blog'];
+    }
     return { collections };
   });
 

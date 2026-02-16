@@ -114,10 +114,18 @@ export default async function postRoutes(fastify) {
 
   // Unpublish post
   fastify.post('/api/posts/:id/unpublish', async (request, reply) => {
-    const post = postModel.unpublish(request.params.id);
+    const post = postModel.findById(request.params.id);
     if (!post) {
       return reply.status(404).send({ error: 'Post not found' });
     }
+
+    // Delete exported file from Astro site
+    if (post.status === 'published') {
+      await exportService.deletePost(post).catch(() => {});
+    }
+
+    // Update status to draft in database
+    const updatedPost = postModel.unpublish(request.params.id);
 
     fastify.logActivity({
       userId: request.user.id,
@@ -127,7 +135,7 @@ export default async function postRoutes(fastify) {
       ipAddress: request.ip
     });
 
-    return { success: true, post };
+    return { success: true, post: updatedPost };
   });
 
   // Get version history

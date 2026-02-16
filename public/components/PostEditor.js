@@ -18,10 +18,13 @@ export function PostEditor({ postId }) {
   const isNew = !postId;
 
   useEffect(() => {
-    loadCollections();
-    if (postId) {
-      loadPost();
+    async function initialize() {
+      await loadCollections();
+      if (postId) {
+        loadPost();
+      }
     }
+    initialize();
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
@@ -36,6 +39,10 @@ export function PostEditor({ postId }) {
       }
     } catch (err) {
       console.error('Failed to load collections:', err);
+      // Keep the current post's collection if it exists
+      if (post.collection && !collections.includes(post.collection)) {
+        setCollections(prev => [...prev, post.collection]);
+      }
     }
   }
 
@@ -97,7 +104,9 @@ export function PostEditor({ postId }) {
   async function handlePublish() {
     try {
       if (isNew) {
+        // Save as draft first, then user can publish
         await handleSave();
+        showToast('Saved as draft. Click Publish again to publish.');
         return;
       }
       await api.publishPost(postId);

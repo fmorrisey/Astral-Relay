@@ -97,15 +97,19 @@ await fastify.register(fastifyCookie, {
 
 await fastify.register(fastifyCors, {
   origin: (() => {
+    // FRONTEND_ORIGINS / ALLOWED_ORIGINS:
+    // Optional comma-separated list of allowed CORS origins, e.g.
+    // "http://localhost:3000,https://app.example.com".
+    // If unset or empty, CORS will reflect the request origin.
     const raw = process.env.FRONTEND_ORIGINS || process.env.ALLOWED_ORIGINS || '';
     if (!raw) return true; // reflect origin
     const allowed = raw.split(',').map(s => s.trim()).filter(Boolean);
     if (allowed.length === 0) return true;
     if (allowed.length === 1) return allowed[0];
     return (origin, cb) => {
-      if (!origin) return cb(null, false);
+      if (!origin) return cb(null, true);
       if (allowed.includes(origin)) return cb(null, true);
-      return cb(new Error('Not allowed by CORS'));
+      return cb(null, false);
     };
   })(),
   credentials: true

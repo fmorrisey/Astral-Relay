@@ -153,10 +153,10 @@ your-astro-site/
 ```yaml
 ---
 title: Your Post Title
-pubDate: 2026-02-15T12:00:00Z
+date: 2026-02-15T12:00:00Z
 description: Post summary
 tags: [travel, photos]
-draft: false
+published: true
 ---
 
 Your markdown content here...
