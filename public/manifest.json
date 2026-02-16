@@ -1,0 +1,10 @@
+{
+  "name": "Astral Relay",
+  "short_name": "Relay",
+  "description": "Self-hosted publishing system for Astro sites",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": []
+}

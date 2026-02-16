@@ -1,0 +1,20 @@
+services:
+  astral-relay:
+    build: .
+    container_name: astral-relay
+    ports:
+      - "3030:3030"
+    volumes:
+      - ./data:/app/data
+      # UPDATE THIS PATH to your Astro site
+      # - /path/to/your/astro-site:/workspace
+    environment:
+      - NODE_ENV=production
+      - PORT=3030
+      - DB_PATH=/app/data/relay.db
+      - WORKSPACE_PATH=/workspace
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-to-a-random-secret}
+      - GIT_SYNC_ENABLED=false
+      - GIT_BRANCH=main
+      - WEBHOOK_URL=
+    restart: unless-stopped
