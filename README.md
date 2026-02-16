@@ -3,7 +3,7 @@
 - ![CI](https://img.shields.io/badge/-CI-lightgrey) ![CD](https://img.shields.io/badge/-CD-lightgrey)
 
 
-> This is Major Tom to Ground Control I'm stepping through the door And I'm floating in a most peculiar way And the stars look very different today
+> "This is Major Tom to Ground Control I'm stepping through the door And I'm floating in a most peculiar way And the stars look very different today" 👨‍🎤🧑‍🚀
 
 A self-hosted, mobile-friendly publishing system for Astro sites. Write, manage, and publish content from any device — Astral Relay exports directly to Astro's content collections format.
 
