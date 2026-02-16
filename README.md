@@ -1,6 +1,7 @@
 # Astral Relay
 
-- ![CI](https://img.shields.io/badge/-CI-lightgrey) ![CD](https://img.shields.io/badge/-CD-lightgrey)
+- [![CI](https://github.com/fmorrisey/Astral-Relay/actions/workflows/ci.yml/badge.svg)](https://github.com/fmorrisey/Astral-Relay/actions/workflows/ci.yml)
+  [![CD](https://github.com/fmorrisey/Astral-Relay/actions/workflows/cd.yml/badge.svg)](https://github.com/fmorrisey/Astral-Relay/actions/workflows/cd.yml)
 
 
 > "This is Major Tom to Ground Control I'm stepping through the door And I'm floating in a most peculiar way And the stars look very different today" 👨‍🎤🧑‍🚀
