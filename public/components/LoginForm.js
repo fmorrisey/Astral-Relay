@@ -1,5 +1,4 @@
-import { html } from 'https://esm.sh/htm/preact/standalone';
-import { useState } from 'https://esm.sh/preact/hooks';
+import { html, useState } from 'https://esm.sh/htm/preact/standalone';
 
 export function LoginForm({ onLogin }) {
   const [username, setUsername] = useState('');

@@ -61,10 +61,10 @@ export class AstroExporter {
   _generateFrontmatter(post, tags) {
     const data = {
       title: post.title,
-      pubDate: post.published_at || post.publishedAt || post.created_at || post.createdAt,
+      date: post.published_at || post.publishedAt || post.created_at || post.createdAt,
       description: post.summary || '',
       tags: tags.map(t => typeof t === 'string' ? t : t.name),
-      draft: post.status !== 'published'
+      published: post.status === 'published'
     };
 
     return yaml.dump(data, {

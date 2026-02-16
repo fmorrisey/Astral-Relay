@@ -25,6 +25,7 @@ export const api = {
   me: () => api.request('/auth/me'),
   setup: (data) => api.request('/auth/setup', { method: 'POST', body: JSON.stringify(data) }),
   setupStatus: () => api.request('/setup/status'),
+  getCollections: () => api.request('/setup/collections'),
 
   // Posts
   getPosts: (params = {}) => api.request(`/posts?${new URLSearchParams(params)}`),
@@ -33,7 +34,7 @@ export const api = {
   updatePost: (id, data) => api.request(`/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deletePost: (id) => api.request(`/posts/${id}`, { method: 'DELETE' }),
   publishPost: (id, data) => api.request(`/posts/${id}/publish`, { method: 'POST', body: JSON.stringify(data || {}) }),
-  unpublishPost: (id) => api.request(`/posts/${id}/unpublish`, { method: 'POST' }),
+  unpublishPost: (id) => api.request(`/posts/${id}/unpublish`, { method: 'POST', body: JSON.stringify({}) }),
   getVersions: (id) => api.request(`/posts/${id}/versions`),
 
   // Media
