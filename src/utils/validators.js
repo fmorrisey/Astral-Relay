@@ -38,6 +38,11 @@ export const schemas = {
     name: Joi.string().min(1).max(50).required()
   }),
 
+  changePassword: Joi.object({
+    currentPassword: Joi.string().required(),
+    newPassword: Joi.string().min(8).required()
+  }),
+
   recover: Joi.object({
     username: Joi.string().alphanum().min(3).max(30).required(),
     // Format is RELAY-XXXX-XXXX-XXXX. Not pattern-matched here: a rejection

@@ -75,6 +75,44 @@ export default async function authRoutes(fastify) {
     };
   });
 
+  // Change your own password. Rate limited with the auth bucket: knowing the
+  // session is not the same as knowing the password, so this is still a place
+  // where the current password can be guessed at.
+  fastify.post('/api/auth/change-password', {
+    config: { rateLimit: rateLimitConfig.auth }
+  }, async (request, reply) => {
+    const sessionId = request.cookies.session;
+    const session = sessionId && authService.validateSession(sessionId);
+    if (!session) {
+      return reply.status(401).send({ error: 'Not authenticated' });
+    }
+
+    const { currentPassword, newPassword } = validate(schemas.changePassword, request.body);
+
+    const result = await authService.changePassword(
+      session.uid,
+      currentPassword,
+      newPassword,
+      sessionId
+    );
+
+    if (!result.ok) {
+      return reply.status(401).send({ error: 'Current password is incorrect' });
+    }
+
+    fastify.logActivity({
+      userId: session.uid,
+      action: 'auth.password.changed',
+      resourceType: 'user',
+      resourceId: String(session.uid),
+      metadata: { sessionsRevoked: result.revoked },
+      ipAddress: request.ip
+    });
+
+    // The caller's own session survives, so no new cookie is needed.
+    return { success: true, sessionsRevoked: result.revoked };
+  });
+
   // Redeem a recovery code to set a new password. Unauthenticated by
   // necessity -- it exists precisely for someone who cannot log in.
   //

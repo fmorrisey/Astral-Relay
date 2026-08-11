@@ -24,6 +24,7 @@ export const api = {
   logout: () => api.request('/auth/logout', { method: 'POST' }),
   me: () => api.request('/auth/me'),
   setup: (data) => api.request('/auth/setup', { method: 'POST', body: JSON.stringify(data) }),
+  changePassword: (data) => api.request('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
   recover: (data) => api.request('/auth/recover', { method: 'POST', body: JSON.stringify(data) }),
   issueRecoveryCode: () => api.request('/auth/recovery-code', { method: 'POST' }),
   setupStatus: () => api.request('/setup/status'),

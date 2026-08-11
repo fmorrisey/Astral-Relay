@@ -6,6 +6,7 @@ import { PostList } from './components/PostList.js';
 import { PostEditor } from './components/PostEditor.js';
 import { MediaUploader } from './components/MediaUploader.js';
 import { Tags } from './components/Tags.js';
+import { Settings } from './components/Settings.js';
 
 function SetupForm({ onComplete }) {
   const [form, setForm] = useState({ username: '', password: '', displayName: '' });
@@ -142,6 +143,10 @@ function App() {
   } else if (route.startsWith('#/posts/')) {
     const id = route.split('/')[2];
     content = html`<${PostEditor} postId=${id} key=${id} />`;
+  } else if (route === '#/settings') {
+    // Reached from the header rather than the tab bar: it is account
+    // management, not one of the content views the tabs switch between.
+    content = html`<div class="container"><${Settings} /></div>`;
   } else {
     // The list views share one tab bar. It used to render only on the Posts
     // branch, so opening Media left the tabs behind with no way back except the
