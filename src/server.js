@@ -7,7 +7,7 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 
 import config from './config.js';
 import logger from './utils/logger.js';
@@ -23,6 +23,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogging } from './middleware/logging.js';
 import { rateLimitConfig } from './middleware/rateLimit.js';
 import { resolveCorsOrigin } from './utils/cors.js';
+import { registerDocs } from './docs/index.js';
 
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
@@ -134,6 +135,12 @@ fastify.addHook('onRequest', requestLogging);
 fastify.setErrorHandler(errorHandler);
 
 // Register routes
+if (config.apiDocs) {
+  const { version } = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf-8'));
+  await registerDocs(fastify, { version });
+  logger.info('API docs at /docs, spec at /api/openapi.json');
+}
+
 await fastify.register(healthRoutes);
 await fastify.register(authRoutes);
 await fastify.register(postRoutes);

@@ -28,7 +28,14 @@ const config = {
   webhookUrl: process.env.WEBHOOK_URL || '',
   webhookTimeout: parseInt(process.env.WEBHOOK_TIMEOUT || '5000', 10),
 
-  logLevel: process.env.LOG_LEVEL || 'info'
+  logLevel: process.env.LOG_LEVEL || 'info',
+
+  // OpenAPI spec and the /docs UI. On by default outside production, because a
+  // complete map of the API surface is not something every deployment should
+  // publish unauthenticated. This install is tailnet-only, so it opts in.
+  apiDocs: process.env.API_DOCS
+    ? process.env.API_DOCS === 'true'
+    : (process.env.NODE_ENV || 'development') !== 'production'
 };
 
 export default config;

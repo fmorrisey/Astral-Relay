@@ -87,6 +87,17 @@ export async function buildFastify(options = {}) {
     }
   });
 
+  // Collect every route as it registers. printRoutes() renders a tree, so a
+  // path is split across lines and cannot be reassembled reliably -- an earlier
+  // attempt to parse it silently matched nothing, which made the coverage test
+  // pass without checking anything.
+  const registeredRoutes = [];
+  fastify.addHook('onRoute', route => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    for (const method of methods) registeredRoutes.push({ method, url: route.url });
+  });
+  fastify.decorate('registeredRoutes', registeredRoutes);
+
   // Register routes
   await fastify.register(healthRoutes);
   await fastify.register(authRoutes);

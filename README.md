@@ -223,6 +223,18 @@ astral-relay/
 └── docker-compose.yml
 ```
 
+## API Documentation
+
+An OpenAPI 3 document is served at `/api/openapi.json`, with a browsable UI at
+`/docs`.
+
+Off by default in production — a complete map of the API surface is not
+something every deployment should publish. Enable with `API_DOCS=true`.
+
+Request bodies in the spec are generated from the same Joi schemas the routes
+validate with, and a test asserts every registered route appears in the
+document, so neither can drift from the code.
+
 ## API Endpoints
 
 ### Auth
