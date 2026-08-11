@@ -231,6 +231,9 @@ astral-relay/
 | `POST` | `/api/auth/login` | Login |
 | `POST` | `/api/auth/logout` | Logout |
 | `GET` | `/api/auth/me` | Current user |
+| `POST` | `/api/auth/change-password` | Change password (signs out other devices) |
+| `POST` | `/api/auth/recovery-code` | Issue a recovery code, shown once |
+| `POST` | `/api/auth/recover` | Redeem a recovery code to reset a password |
 
 ### Posts
 | Method | Path | Description |
