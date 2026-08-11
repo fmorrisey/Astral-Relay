@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
+import { runMigrations } from './migrations.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -32,7 +33,14 @@ class DB {
       this.db.exec(seed);
 
       logger.info('Database initialized with schema and seed data');
-    } else {
+    }
+
+    // Runs for fresh and existing databases alike. Previously this method only
+    // ever applied schema.sql to a brand-new file and logged "up to date" for
+    // everything else, so a schema change had no way to reach a deployed
+    // database at all.
+    const applied = runMigrations(this);
+    if (applied.length === 0) {
       logger.info('Database schema up to date');
     }
   }
