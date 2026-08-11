@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test \"tests/**/*.test.js\"",
+    "test": "node --test $(find tests -name '*.test.js' | sort)",
     "migrate": "node src/db/migrate.js",
     "reset-password": "node scripts/reset-password.mjs"
   },
