@@ -17,6 +17,7 @@ import postRoutes from '../../src/routes/posts.js';
 import mediaRoutes from '../../src/routes/media.js';
 import tagRoutes from '../../src/routes/tags.js';
 import setupRoutes from '../../src/routes/setup.js';
+import userRoutes from '../../src/routes/users.js';
 
 /**
  * Build a Fastify instance for testing
@@ -93,6 +94,7 @@ export async function buildFastify(options = {}) {
   await fastify.register(mediaRoutes);
   await fastify.register(tagRoutes);
   await fastify.register(setupRoutes);
+  await fastify.register(userRoutes);
 
   return fastify;
 }

@@ -1,11 +1,22 @@
 import { validate, schemas } from '../utils/validators.js';
 import { authenticate } from '../middleware/authenticate.js';
+import { ownsOrAdmin, ROLES } from '../middleware/authorize.js';
 
 export default async function postRoutes(fastify) {
   const { postModel, exportService, authService } = fastify;
   const auth = authenticate(authService);
 
   fastify.addHook('preHandler', auth);
+
+  // Ownership is checked per-route rather than by a hook: reading is open to
+  // any authenticated user, and only mutations are restricted to the owner.
+  // Checked against created_by in the database, never against anything the
+  // request supplies.
+  function denyIfNotOwner(request, reply, post) {
+    if (ownsOrAdmin(request.user, post.createdBy)) return false;
+    reply.status(403).send({ error: 'You can only modify your own posts' });
+    return true;
+  }
 
   // List posts
   fastify.get('/api/posts', async (request) => {
@@ -47,6 +58,12 @@ export default async function postRoutes(fastify) {
 
   // Update post
   fastify.put('/api/posts/:id', async (request, reply) => {
+    const existing = postModel.findById(request.params.id);
+    if (!existing) {
+      return reply.status(404).send({ error: 'Post not found' });
+    }
+    if (denyIfNotOwner(request, reply, existing)) return reply;
+
     const data = validate(schemas.updatePost, request.body);
     const post = postModel.update(request.params.id, data);
 
@@ -67,6 +84,7 @@ export default async function postRoutes(fastify) {
     if (!post) {
       return reply.status(404).send({ error: 'Post not found' });
     }
+    if (denyIfNotOwner(request, reply, post)) return reply;
 
     // Delete exported file if published
     if (post.status === 'published') {
@@ -94,6 +112,9 @@ export default async function postRoutes(fastify) {
     if (!existing) {
       return reply.status(404).send({ error: 'Post not found' });
     }
+    // Publishing writes to the live site, so it is restricted the same way
+    // editing is -- an author may publish their own work, nobody else's.
+    if (denyIfNotOwner(request, reply, existing)) return reply;
 
     // Export first, then commit the status change -- the same order the
     // unpublish route already uses. The export can legitimately fail: it
@@ -130,6 +151,8 @@ export default async function postRoutes(fastify) {
     if (!post) {
       return reply.status(404).send({ error: 'Post not found' });
     }
+
+    if (denyIfNotOwner(request, reply, post)) return reply;
 
     // Delete exported file from Astro site
     if (post.status === 'published') {

@@ -41,18 +41,21 @@ describe('migration runner', () => {
 
   it('applies a pending migration', () => {
     baseline();
-    write('002_add_user_role.sql', "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';");
+    // A column no real migration adds: the harness now applies the real ones,
+    // so reusing a shipped column name would collide with it rather than test
+    // anything.
+    write('900_add_nickname.sql', 'ALTER TABLE users ADD COLUMN nickname TEXT;');
 
     const applied = runMigrations(db, { dir, log: silent });
 
-    assert.deepStrictEqual(applied, ['002_add_user_role']);
+    assert.deepStrictEqual(applied, ['900_add_nickname']);
     const cols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
-    assert.ok(cols.includes('role'));
+    assert.ok(cols.includes('nickname'));
   });
 
   it('records the migration so a second run is a no-op', () => {
     baseline();
-    write('002_add_user_role.sql', "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';");
+    write('900_add_nickname.sql', 'ALTER TABLE users ADD COLUMN nickname TEXT;');
 
     runMigrations(db, { dir, log: silent });
     const second = runMigrations(db, { dir, log: silent });
@@ -60,7 +63,7 @@ describe('migration runner', () => {
     assert.deepStrictEqual(second, []);
     // Re-running the ALTER would throw "duplicate column name", so an empty
     // result here is the whole point: it was skipped, not retried.
-    assert.ok(appliedMigrations(db).has('002_add_user_role'));
+    assert.ok(appliedMigrations(db).has('900_add_nickname'));
   });
 
   it('never re-runs the baseline recorded by seed.sql', () => {

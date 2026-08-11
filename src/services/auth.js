@@ -138,7 +138,7 @@ export class AuthService {
 
   validateSession(sessionId) {
     const session = this.db.prepare(`
-      SELECT s.*, u.id as uid, u.username, u.display_name, u.email
+      SELECT s.*, u.id as uid, u.username, u.display_name, u.email, u.role
       FROM sessions s
       JOIN users u ON s.user_id = u.id
       WHERE s.id = ? AND s.expires_at > datetime('now')

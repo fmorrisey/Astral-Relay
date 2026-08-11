@@ -30,6 +30,7 @@ import postRoutes from './routes/posts.js';
 import mediaRoutes from './routes/media.js';
 import tagRoutes from './routes/tags.js';
 import setupRoutes from './routes/setup.js';
+import userRoutes from './routes/users.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
@@ -139,6 +140,7 @@ await fastify.register(postRoutes);
 await fastify.register(mediaRoutes);
 await fastify.register(tagRoutes);
 await fastify.register(setupRoutes);
+await fastify.register(userRoutes);
 
 // SPA fallback - serve index.html for non-API, non-file routes
 fastify.setNotFoundHandler(async (request, reply) => {

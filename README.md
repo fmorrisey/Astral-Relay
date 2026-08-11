@@ -52,6 +52,7 @@ Write in Astral Relay → Publish → Exports to Astro → Build Astro → Live 
 - **Image upload** with automatic optimization via Sharp
 - **One-click publish** — exports to `src/content/{collection}/{slug}.md` with YAML frontmatter
 - **Session-based auth** with Argon2id password hashing
+- **Roles** — admins manage everything; authors manage their own posts and media
 - **Docker deployment** — single container, volume-mount your Astro repo
 - **Optional webhook** — trigger builds on publish
 - **Optional Git sync** — auto-commit and push on publish
@@ -234,6 +235,13 @@ astral-relay/
 | `POST` | `/api/auth/change-password` | Change password (signs out other devices) |
 | `POST` | `/api/auth/recovery-code` | Issue a recovery code, shown once |
 | `POST` | `/api/auth/recover` | Redeem a recovery code to reset a password |
+
+### Users (admin only)
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/users` | List users |
+| `POST` | `/api/users` | Create a user (`role`: `author` default, or `admin`) |
+| `DELETE` | `/api/users/:id` | Delete a user who owns no content |
 
 ### Posts
 | Method | Path | Description |

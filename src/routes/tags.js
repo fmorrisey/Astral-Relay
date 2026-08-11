@@ -1,4 +1,5 @@
 import { authenticate } from '../middleware/authenticate.js';
+import { authorize, ROLES } from '../middleware/authorize.js';
 import { validate, schemas } from '../utils/validators.js';
 
 export default async function tagRoutes(fastify) {
@@ -20,8 +21,10 @@ export default async function tagRoutes(fastify) {
     return reply.status(201).send({ success: true, tag });
   });
 
-  // Delete tag
-  fastify.delete('/api/tags/:id', async (request, reply) => {
+  // Admin-only. Tag.delete clears post_tags first, so removing a tag strips it
+  // from every post that used it -- including other people's. Creating tags
+  // stays open to any author; only the destructive half is restricted.
+  fastify.delete('/api/tags/:id', { preHandler: authorize(ROLES.ADMIN) }, async (request, reply) => {
     const tag = tagModel.findById(parseInt(request.params.id, 10));
     if (!tag) {
       return reply.status(404).send({ error: 'Tag not found' });

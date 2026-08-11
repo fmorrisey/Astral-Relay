@@ -8,15 +8,19 @@ export function createTestUser(db, overrides = {}) {
   const passwordHash = overrides.passwordHash || '$argon2id$v=19$m=65536,t=3,p=4$test$testhash'; // Dummy hash
   const displayName = overrides.displayName || 'Test User';
   const email = overrides.email || 'test@example.com';
+  // Defaults to admin, matching the setup wizard and the migration backfill, so
+  // existing tests keep the unrestricted user they were written against.
+  const role = overrides.role || 'admin';
 
   const result = db.prepare(`
-    INSERT INTO users (username, password_hash, display_name, email)
-    VALUES (?, ?, ?, ?)
-  `).run(username, passwordHash, displayName, email);
+    INSERT INTO users (username, password_hash, display_name, email, role)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(username, passwordHash, displayName, email, role);
 
   return {
     id: result.lastInsertRowid,
     username,
+    role,
     displayName,
     email
   };

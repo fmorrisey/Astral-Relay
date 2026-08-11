@@ -1,7 +1,8 @@
 import { html, useState } from 'https://esm.sh/htm/preact/standalone';
 import { api } from '../lib/api.js';
+import { Users } from './Users.js';
 
-export function Settings() {
+export function Settings({ user }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -121,6 +122,12 @@ export function Settings() {
           </button>
         `}
       </div>
+
+      ${user?.role === 'admin' && html`
+        <div style="margin-top: 16px">
+          <${Users} currentUserId=${user.id} onToast=${showToast} />
+        </div>
+      `}
 
       ${toast && html`<div class="toast toast-${toast.type}">${toast.message}</div>`}
     </div>
