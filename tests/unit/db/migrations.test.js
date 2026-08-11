@@ -31,10 +31,12 @@ describe('migration runner', () => {
     writeFileSync(join(dir, name), sql);
   }
 
-  // schema.sql + seed.sql are the baseline. TestDB applies schema.sql only, so
-  // record the baseline row the way seed.sql does.
+  // schema.sql + seed.sql are the baseline. TestDB already records it (and then
+  // applies the real migrations), so this is OR IGNORE rather than a plain
+  // insert -- it documents the precondition these tests rely on without
+  // colliding with the harness on migrations.name.
   function baseline() {
-    db.prepare("INSERT INTO migrations (name) VALUES ('001_initial_schema')").run();
+    db.prepare("INSERT OR IGNORE INTO migrations (name) VALUES ('001_initial_schema')").run();
   }
 
   it('applies a pending migration', () => {
