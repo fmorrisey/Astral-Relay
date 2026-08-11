@@ -25,6 +25,12 @@ export const api = {
   me: () => api.request('/auth/me'),
   setup: (data) => api.request('/auth/setup', { method: 'POST', body: JSON.stringify(data) }),
   changePassword: (data) => api.request('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Users (admin only; the server enforces, these just 403 otherwise)
+  getUsers: () => api.request('/users'),
+  createUser: (data) => api.request('/users', { method: 'POST', body: JSON.stringify(data) }),
+  deleteUser: (id) => api.request(`/users/${id}`, { method: 'DELETE' }),
+
   recover: (data) => api.request('/auth/recover', { method: 'POST', body: JSON.stringify(data) }),
   issueRecoveryCode: () => api.request('/auth/recovery-code', { method: 'POST' }),
   setupStatus: () => api.request('/setup/status'),

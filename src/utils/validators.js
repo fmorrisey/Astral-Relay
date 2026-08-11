@@ -38,6 +38,16 @@ export const schemas = {
     name: Joi.string().min(1).max(50).required()
   }),
 
+  createUser: Joi.object({
+    username: Joi.string().alphanum().min(3).max(30).required(),
+    password: Joi.string().min(8).required(),
+    displayName: Joi.string().max(100).optional(),
+    email: Joi.string().email().optional(),
+    // Explicit and constrained: an unrecognised role would be rejected by
+    // authorize() at every route, creating an account that can do nothing.
+    role: Joi.string().valid('admin', 'author').default('author')
+  }),
+
   changePassword: Joi.object({
     currentPassword: Joi.string().required(),
     newPassword: Joi.string().min(8).required()

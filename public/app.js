@@ -146,7 +146,7 @@ function App() {
   } else if (route === '#/settings') {
     // Reached from the header rather than the tab bar: it is account
     // management, not one of the content views the tabs switch between.
-    content = html`<div class="container"><${Settings} /></div>`;
+    content = html`<div class="container"><${Settings} user=${user} /></div>`;
   } else {
     // The list views share one tab bar. It used to render only on the Posts
     // branch, so opening Media left the tabs behind with no way back except the

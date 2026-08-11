@@ -39,7 +39,11 @@ export default async function authRoutes(fastify) {
       user: {
         id: user.id,
         username: user.username,
-        displayName: user.display_name
+        displayName: user.display_name,
+        // Included so the UI knows the role immediately. Without it the app
+        // holds a role-less user until the next page load re-fetches /me, and
+        // admin-only controls stay hidden from an admin who just signed in.
+        role: user.role
       }
     };
   });
@@ -70,7 +74,10 @@ export default async function authRoutes(fastify) {
         id: session.uid,
         username: session.username,
         displayName: session.display_name,
-        email: session.email
+        email: session.email,
+        // Exposed so the UI can hide what it must not offer. The server still
+        // enforces; this only avoids showing controls that would 403.
+        role: session.role
       }
     };
   });

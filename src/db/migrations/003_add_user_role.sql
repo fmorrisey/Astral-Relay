@@ -1,0 +1,11 @@
+-- Roles. Until now every authenticated user could do everything, because there
+-- was only ever one.
+--
+-- Defaults to 'admin' so existing rows are backfilled as admin: the account
+-- that has been running the site must not lose access to it mid-migration.
+-- New accounts are created with an explicit role, so the default only ever
+-- applies to rows that predate this column.
+--
+-- NOT NULL with a DEFAULT because SQLite cannot add a NOT NULL column without
+-- one to a table that already has rows.
+ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';

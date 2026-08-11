@@ -16,7 +16,10 @@ export function authenticate(authService) {
       id: session.uid,
       username: session.username,
       displayName: session.display_name,
-      email: session.email
+      email: session.email,
+      // Read from the session join on every request, so a role change takes
+      // effect immediately rather than at next login.
+      role: session.role
     };
   };
 }

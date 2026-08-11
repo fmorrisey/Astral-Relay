@@ -1,4 +1,5 @@
 import { authenticate } from '../middleware/authenticate.js';
+import { ownsOrAdmin } from '../middleware/authorize.js';
 import { processUpload, isAllowedType } from '../utils/imageProcessor.js';
 
 export default async function mediaRoutes(fastify) {
@@ -70,6 +71,12 @@ export default async function mediaRoutes(fastify) {
     const media = mediaModel.findById(request.params.id);
     if (!media) {
       return reply.status(404).send({ error: 'Media not found' });
+    }
+
+    // Deleting a file removes it from the live site, and it may be referenced
+    // by someone else's post. Owner or admin only.
+    if (!ownsOrAdmin(request.user, media.createdBy)) {
+      return reply.status(403).send({ error: 'You can only delete your own media' });
     }
 
     await storageService.deleteMedia(media.storagePath);
