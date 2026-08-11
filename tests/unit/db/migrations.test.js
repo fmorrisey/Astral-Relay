@@ -121,10 +121,33 @@ describe('migration runner', () => {
     baseline();
     write('002_own_transaction.sql', 'BEGIN; CREATE TABLE t (id INTEGER); COMMIT;');
 
+    // SQLite rejects the nested BEGIN; the runner adds the explanation.
     assert.throws(
       () => runMigrations(db, { dir, log: silent }),
-      /transaction control/
+      /must not contain BEGIN\/COMMIT/
     );
+  });
+
+  // `BEGIN` also opens a CREATE TRIGGER body. Rejecting those by pattern would
+  // refuse a legitimate migration -- and fatally, since DB.migrate() runs on
+  // boot, so the server would not start after the deploy.
+  it('applies a migration containing a trigger', () => {
+    baseline();
+    write(
+      '002_add_trigger.sql',
+      `CREATE TRIGGER posts_touch AFTER UPDATE ON posts
+       BEGIN
+         UPDATE posts SET updated_at = datetime('now') WHERE id = NEW.id;
+       END;`
+    );
+
+    const applied = runMigrations(db, { dir, log: silent });
+
+    assert.deepStrictEqual(applied, ['002_add_trigger']);
+    const trigger = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name='posts_touch'")
+      .get();
+    assert.ok(trigger);
   });
 
   it('rejects a misnamed file instead of silently skipping it', () => {

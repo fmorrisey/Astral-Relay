@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync, mkdirSync } from 'fs';
 import DB from './index.js';
 import config from '../config.js';
 import logger from '../utils/logger.js';
@@ -16,13 +17,23 @@ const dbPath = config.dbPath.startsWith('/') ? config.dbPath : join(projectRoot,
 // Same resolution as server.js, so `npm run migrate` and boot always act on the
 // same file. DB.migrate() initialises a fresh database from schema.sql + seed.sql
 // and then applies any pending migrations, so this is safe on both.
-const db = new DB(dbPath);
+let db;
 
 try {
+  // server.js creates this before opening the database; without it a fresh
+  // clone fails with a bare SQLITE_CANTOPEN rather than anything actionable.
+  const dataDir = dirname(dbPath);
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+
+  // Inside the try: opening the database can fail too, and doing it outside
+  // meant that failure escaped as an unhandled stack trace.
+  db = new DB(dbPath);
   db.migrate();
 } catch (err) {
   logger.error({ error: err.message }, 'Migration failed');
   process.exitCode = 1;
 } finally {
-  db.close();
+  db?.close();
 }

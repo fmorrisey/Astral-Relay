@@ -1,9 +1,11 @@
 import { html, useState, useEffect } from 'https://esm.sh/htm/preact/standalone';
 import { api } from '../lib/api.js';
 
-// Matches the backend ordering (Tag.list() is ORDER BY name ASC), so a newly
-// created tag can be slotted into place without refetching the whole list.
-const byName = (a, b) => a.name.localeCompare(b.name);
+// Matches the backend ordering so a newly created tag can be slotted into place
+// without refetching. Tag.list() is ORDER BY name ASC under SQLite's default
+// BINARY collation, which is case-sensitive -- localeCompare is not, and would
+// put a new tag somewhere the next page load moves it away from.
+const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
 export function Tags() {
   const [tags, setTags] = useState([]);
@@ -18,8 +20,10 @@ export function Tags() {
     loadTags();
   }, []);
 
-  async function loadTags() {
-    setLoading(true);
+  // `silent` refetches without dropping into the full-page loading view, which
+  // would unmount the toast that prompted the refetch before it could paint.
+  async function loadTags({ silent = false } = {}) {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const data = await api.getTags();
@@ -67,8 +71,9 @@ export function Tags() {
     } catch (err) {
       showToast(err.message, 'error');
       // The row may be gone server-side (404) or still there (500). Refetch so
-      // the list reflects reality rather than an assumption about which.
-      loadTags();
+      // the list reflects reality rather than an assumption about which --
+      // silently, so the error toast above survives long enough to be read.
+      loadTags({ silent: true });
     }
   }
 
@@ -81,7 +86,7 @@ export function Tags() {
       <div class="empty-state">
         <h2>Couldn't load tags</h2>
         <p>${error}</p>
-        <button class="btn btn-primary" onClick=${loadTags}>Retry</button>
+        <button class="btn btn-primary" onClick=${() => loadTags()}>Retry</button>
       </div>
     `;
   }

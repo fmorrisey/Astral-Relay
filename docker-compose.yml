@@ -19,11 +19,13 @@ services:
       - GIT_SYNC_ENABLED=false
       - GIT_BRANCH=main
       - WEBHOOK_URL=
-      # Served as plain HTTP behind the tailnet-bound nginx vhost, so there is no
-      # TLS for a Secure cookie to ride on and the browser would discard it.
-      # WireGuard already encrypts the only path to this port.
-      - COOKIE_SECURE=false
-      # The UI is served from the same origin as the API, so this is the only
-      # origin that ever needs to be allowed.
-      - FRONTEND_ORIGINS=http://astralrelay.rainierserver.com
+      # Both default to the SAFE value, so copying this file does not silently
+      # weaken a TLS deployment. This install overrides COOKIE_SECURE=false in
+      # .env, because it is served as plain HTTP behind a tailnet-bound nginx
+      # vhost: there is no TLS for a Secure cookie to ride on, the browser would
+      # discard it, and WireGuard already encrypts the only path to the port.
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
+      # Same-origin UI, so the deployment sets its own origin in .env. Empty
+      # means same-origin only in production.
+      - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-}
     restart: unless-stopped

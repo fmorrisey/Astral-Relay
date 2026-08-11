@@ -89,16 +89,28 @@ export default async function postRoutes(fastify) {
   // Publish post
   fastify.post('/api/posts/:id/publish', async (request, reply) => {
     const { publishedAt } = request.body || {};
-    const post = postModel.publish(request.params.id, publishedAt);
-    if (!post) {
+
+    const existing = postModel.findById(request.params.id);
+    if (!existing) {
       return reply.status(404).send({ error: 'Post not found' });
     }
 
-    // Get raw post data for export
+    // Export first, then commit the status change -- the same order the
+    // unpublish route already uses. The export can legitimately fail: it
+    // refuses to overwrite an entry whose existing frontmatter is unparseable.
+    // Flipping the database to published first would leave a post shown as
+    // published with no file on disk, and every retry would rewrite
+    // published_at again.
+    const timestamp = publishedAt || new Date().toISOString();
     const raw = fastify.db.prepare('SELECT * FROM posts WHERE id = ?').get(request.params.id);
     const tags = postModel._getPostTags(request.params.id);
 
-    const exported = await exportService.publishPost(raw, tags);
+    const exported = await exportService.publishPost(
+      { ...raw, status: 'published', published_at: timestamp },
+      tags
+    );
+
+    const post = postModel.publish(request.params.id, timestamp);
 
     fastify.logActivity({
       userId: request.user.id,

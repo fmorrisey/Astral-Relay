@@ -19,10 +19,12 @@ carry the same row, so both start from the same baseline.
 
 ## Rules
 
-- **No `BEGIN` / `COMMIT` / `ROLLBACK`.** The runner wraps each migration in a
-  transaction along with its bookkeeping row, so a migration cannot end up
-  applied-but-unrecorded. Nested transaction control breaks that guarantee, and
-  the runner rejects files containing it.
+- **No `BEGIN` / `COMMIT` / `ROLLBACK` statements.** The runner wraps each
+  migration in a transaction along with its bookkeeping row, so a migration
+  cannot end up applied-but-unrecorded. SQLite rejects a nested `BEGIN`, and the
+  runner adds a hint to that error.
+  **Triggers are fine** — the `BEGIN` that opens a `CREATE TRIGGER` body is not
+  transaction control and is not treated as such.
 - **Never edit a migration that has shipped.** It will not re-run — it is
   recorded as applied. Add a new one.
 - **Additive changes are safest.** SQLite's `ALTER TABLE` is limited: it cannot

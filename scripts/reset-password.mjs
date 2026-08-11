@@ -11,6 +11,11 @@
 //
 // Hashing parameters match src/services/auth.js.
 
+// Loaded so DB_PATH from .env is honoured, matching the server and the other
+// scripts. Without it this would silently fall back to ./data/relay.db and
+// better-sqlite3 would create an empty database there, reporting no such user
+// while the real account sat untouched elsewhere.
+import 'dotenv/config';
 import { createInterface } from 'readline';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -44,11 +49,21 @@ async function readPassword() {
 
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
   process.stdout.write('New password: ');
-  rl.output.write = () => {};   // suppress echo of the typed characters
-  const answer = await new Promise(resolve => rl.question('', resolve));
-  rl.close();
-  process.stdout.write('\n');
-  return answer;
+
+  // Suppress the echo of typed characters. rl.output IS process.stdout, so this
+  // must be restored -- leaving it stubbed silently discards every later write,
+  // including the success message, which reads as a failed run and invites
+  // someone to reset the password a second time.
+  const originalWrite = process.stdout.write;
+  process.stdout.write = () => true;
+  try {
+    const answer = await new Promise(resolve => rl.question('', resolve));
+    return answer;
+  } finally {
+    process.stdout.write = originalWrite;
+    rl.close();
+    process.stdout.write('\n');
+  }
 }
 
 const password = await readPassword();

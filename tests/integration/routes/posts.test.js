@@ -1,5 +1,7 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert';
+import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { join } from 'path';
 import { buildFastify } from '../../helpers/fastify.js';
 import { createTestUser, createTestSession, createTestPost } from '../../helpers/fixtures.js';
 
@@ -290,6 +292,35 @@ describe('Post routes', () => {
       assert.strictEqual(body.success, true);
       assert.strictEqual(body.post.status, 'published');
       assert.ok(body.post.publishedAt);
+    });
+
+    // The export can fail for a legitimate reason: AstroExporter refuses to
+    // overwrite an entry whose existing frontmatter is unparseable. If the
+    // status were committed first, the CMS would show a published post with no
+    // file on disk, and each retry would rewrite published_at again.
+    it('leaves the post unpublished when the export fails', async () => {
+      await setupAuth();
+      const post = createTestPost(app.db, user.id);
+      const dir = join('/tmp/test-workspace/src/content', post.collection);
+      mkdirSync(dir, { recursive: true });
+      const file = join(dir, `${post.slug}.md`);
+      writeFileSync(file, '---\ntitle: "unterminated\n  bad: [1, 2\n---\n\nBody.\n');
+
+      try {
+        const response = await app.inject({
+          method: 'POST',
+          url: `/api/posts/${post.id}/publish`,
+          cookies: { session: sessionId }
+        });
+
+        assert.notStrictEqual(response.statusCode, 200);
+
+        const row = app.db.prepare('SELECT status, published_at FROM posts WHERE id = ?').get(post.id);
+        assert.strictEqual(row.status, 'draft');
+        assert.strictEqual(row.published_at, null);
+      } finally {
+        rmSync(file, { force: true });
+      }
     });
 
     it('accepts custom publish date', async () => {
