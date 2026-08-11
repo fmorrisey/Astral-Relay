@@ -11,6 +11,15 @@ const config = {
   sessionSecret: process.env.SESSION_SECRET || randomBytes(32).toString('hex'),
   sessionMaxAge: parseInt(process.env.SESSION_MAX_AGE || '604800000', 10),
 
+  // Defaults to on in production. Set COOKIE_SECURE=false only when the sole route
+  // to this server is already encrypted below HTTP -- e.g. behind a tailnet-bound
+  // reverse proxy, where WireGuard is the transport and there is no TLS to attach
+  // the cookie to. Browsers silently DROP a Secure cookie sent over http://, so
+  // leaving this on in that setup makes login return 200 and then not stick.
+  cookieSecure: process.env.COOKIE_SECURE
+    ? process.env.COOKIE_SECURE === 'true'
+    : (process.env.NODE_ENV || 'development') === 'production',
+
   maxUploadSize: parseInt(process.env.MAX_UPLOAD_SIZE || '10485760', 10),
 
   gitSyncEnabled: process.env.GIT_SYNC_ENABLED === 'true',

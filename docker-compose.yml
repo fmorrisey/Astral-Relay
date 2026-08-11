@@ -3,11 +3,13 @@ services:
     build: .
     container_name: astral-relay
     ports:
-      - "3031:3031"
+      # Loopback ONLY. The nginx vhost on the tailnet IP is the sole way in; a
+      # 0.0.0.0 publish here would hand the whole LAN a route that skips it.
+      - "127.0.0.1:3031:3031"
     volumes:
       - ./data:/app/data
-      # UPDATE THIS PATH to your Astro site
-      # - /path/to/your/astro-site:/workspace
+      # Host path to your Astro site; set HOST_WORKSPACE_PATH in .env
+      - ${HOST_WORKSPACE_PATH:?set HOST_WORKSPACE_PATH in .env to your Astro site path}:/workspace
     environment:
       - NODE_ENV=production
       - PORT=3031
@@ -17,4 +19,8 @@ services:
       - GIT_SYNC_ENABLED=false
       - GIT_BRANCH=main
       - WEBHOOK_URL=
+      # Served as plain HTTP behind the tailnet-bound nginx vhost, so there is no
+      # TLS for a Secure cookie to ride on and the browser would discard it.
+      # WireGuard already encrypts the only path to this port.
+      - COOKIE_SECURE=false
     restart: unless-stopped

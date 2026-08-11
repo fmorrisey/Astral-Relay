@@ -28,7 +28,7 @@ export default async function authRoutes(fastify) {
     reply.setCookie('session', sessionId, {
       path: '/',
       httpOnly: true,
-      secure: config.env === 'production',
+      secure: config.cookieSecure,
       sameSite: 'strict',
       expires: expiresAt
     });
@@ -133,7 +133,7 @@ export default async function authRoutes(fastify) {
     reply.setCookie('session', sessionId, {
       path: '/',
       httpOnly: true,
-      secure: config.env === 'production',
+      secure: config.cookieSecure,
       sameSite: 'strict',
       expires: expiresAt
     });
