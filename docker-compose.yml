@@ -23,4 +23,7 @@ services:
       # TLS for a Secure cookie to ride on and the browser would discard it.
       # WireGuard already encrypts the only path to this port.
       - COOKIE_SECURE=false
+      # The UI is served from the same origin as the API, so this is the only
+      # origin that ever needs to be allowed.
+      - FRONTEND_ORIGINS=http://astralrelay.rainierserver.com
     restart: unless-stopped
