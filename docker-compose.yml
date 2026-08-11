@@ -28,4 +28,7 @@ services:
       # Same-origin UI, so the deployment sets its own origin in .env. Empty
       # means same-origin only in production.
       - FRONTEND_ORIGINS=${FRONTEND_ORIGINS:-}
+      # Off by default in production; this install opts in via .env because it is
+      # reachable only over the tailnet.
+      - API_DOCS=${API_DOCS:-false}
     restart: unless-stopped
