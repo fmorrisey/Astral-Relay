@@ -10,12 +10,34 @@ A self-hosted, mobile-friendly publishing system for Astro sites. Write, manage,
 
 ## ⚠️ Important: How This Works
 
-**Astral Relay is a write-first CMS, not an import tool.**
+**Astral Relay is a write-first CMS with a one-way import.**
 
 - ✅ Write new posts in Astral Relay
 - ✅ Click "Publish" → exports `.md` files to your Astro site
 - ✅ Your Astro build picks up the new content
-- ❌ Does NOT import existing content from your Astro site
+- ✅ Pull existing content in once with `npm run import`
+- ❌ Does **not** watch the workspace — files edited outside Astral Relay after an
+  import are not picked up until you re-run it
+
+### Importing existing content
+
+```bash
+npm run import -- --dry-run          # report what would happen, change nothing
+npm run import                       # import every collection
+npm run import -- --collection blog  # limit to one collection
+```
+
+The import reads `src/content/{collection}/*.md` and never writes to the
+workspace. It is idempotent — matching on collection + slug, so re-running
+updates instead of duplicating — and the slug comes from the **filename**, not
+the title, so page URLs are preserved.
+
+Frontmatter keys Astral Relay doesn't model are deliberately left in the file
+rather than copied into the database. The file stays their source of truth, and
+publishing merges them back in.
+
+Entries that can't be mapped (no frontmatter, no title, invalid YAML) are
+reported, not silently skipped.
 
 **The workflow:**
 ```
