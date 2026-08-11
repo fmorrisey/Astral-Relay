@@ -5,6 +5,7 @@ import { LoginForm } from './components/LoginForm.js';
 import { PostList } from './components/PostList.js';
 import { PostEditor } from './components/PostEditor.js';
 import { MediaUploader } from './components/MediaUploader.js';
+import { Tags } from './components/Tags.js';
 
 function SetupForm({ onComplete }) {
   const [form, setForm] = useState({ username: '', password: '', displayName: '' });
@@ -136,21 +137,31 @@ function App() {
 
   // Parse route
   let content;
-  if (route === '#/media') {
-    content = html`<div class="container"><${MediaUploader} /></div>`;
-  } else if (route === '#/posts/new') {
+  if (route === '#/posts/new') {
     content = html`<${PostEditor} />`;
   } else if (route.startsWith('#/posts/')) {
     const id = route.split('/')[2];
     content = html`<${PostEditor} postId=${id} key=${id} />`;
   } else {
+    // The list views share one tab bar. It used to render only on the Posts
+    // branch, so opening Media left the tabs behind with no way back except the
+    // header title -- and that branch's own '#/media' active check could never
+    // be true, since reaching it meant the route was not '#/media'.
+    const view = route === '#/media' ? 'media' : route === '#/tags' ? 'tags' : 'posts';
+    const go = hash => () => { window.location.hash = hash; };
+
     content = html`
       <div class="container">
         <div class="tabs" style="margin-bottom: 0; margin-top: 8px">
-          <button class="tab ${!route.includes('media') ? 'active' : ''}" onClick=${() => window.location.hash = '#/'}>Posts</button>
-          <button class="tab ${route === '#/media' ? 'active' : ''}" onClick=${() => window.location.hash = '#/media'}>Media</button>
+          <button class="tab ${view === 'posts' ? 'active' : ''}" onClick=${go('#/')}>Posts</button>
+          <button class="tab ${view === 'media' ? 'active' : ''}" onClick=${go('#/media')}>Media</button>
+          <button class="tab ${view === 'tags' ? 'active' : ''}" onClick=${go('#/tags')}>Tags</button>
         </div>
-        <${PostList} />
+        ${view === 'media'
+          ? html`<${MediaUploader} />`
+          : view === 'tags'
+            ? html`<${Tags} />`
+            : html`<${PostList} />`}
       </div>
     `;
   }
