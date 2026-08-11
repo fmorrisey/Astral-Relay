@@ -158,13 +158,20 @@ your-astro-site/
 ---
 title: Your Post Title
 date: 2026-02-15T12:00:00Z
-description: Post summary
+summary: Post summary
 tags: [travel, photos]
 published: true
 ---
 
 Your markdown content here...
 ```
+
+**Publishing over an existing entry preserves fields Astral Relay doesn't model.**
+Only the five keys above are rewritten. Anything else already in the file —
+`heroImage`, `gallery`, `featured`, `tech`, `links`, `description`, and so on —
+is carried through untouched, so a richer Astro schema survives a publish. If the
+existing frontmatter is not valid YAML, the publish fails rather than replacing
+the file.
 
 ## First Time Setup
 
