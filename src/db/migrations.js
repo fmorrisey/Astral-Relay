@@ -74,12 +74,6 @@ export function runMigrations(db, { dir = MIGRATIONS_DIR, log = logger } = {}) {
     const name = file.replace(/\.sql$/, '');
     const sql = readFileSync(join(dir, file), 'utf-8');
 
-    if (/^\s*(BEGIN|COMMIT|ROLLBACK)\b/im.test(sql)) {
-      throw new Error(
-        `Migration ${file} contains its own transaction control; the runner manages transactions`
-      );
-    }
-
     const apply = db.transaction(() => {
       db.exec(sql);
       db.prepare('INSERT INTO migrations (name) VALUES (?)').run(name);
@@ -90,7 +84,16 @@ export function runMigrations(db, { dir = MIGRATIONS_DIR, log = logger } = {}) {
     } catch (err) {
       // Surface which migration failed. Without the name, a stack trace from
       // deep inside SQLite says nothing about which file to fix.
-      throw new Error(`Migration ${file} failed: ${err.message}`, { cause: err });
+      //
+      // A migration must not open its own transaction, but that is not checked
+      // by pattern-matching the SQL: `BEGIN` also starts a trigger body, and a
+      // guard that rejected those would refuse legitimate migrations -- fatally,
+      // since DB.migrate() runs on boot. SQLite itself rejects a nested BEGIN,
+      // so the check is left to the engine and only the hint is added here.
+      const hint = /within a transaction/i.test(err.message)
+        ? ' (migrations must not contain BEGIN/COMMIT; the runner owns the transaction)'
+        : '';
+      throw new Error(`Migration ${file} failed: ${err.message}${hint}`, { cause: err });
     }
 
     applied.push(name);
