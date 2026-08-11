@@ -6,9 +6,13 @@ export class Post {
     this.db = db;
   }
 
-  create({ collection, title, body, summary, tags, userId }) {
+  create({ collection, title, body, summary, tags, userId, slug: providedSlug }) {
     const id = uuid();
-    const slug = slugify(title);
+    // Normally derived from the title. Import passes the slug explicitly,
+    // because an existing entry's slug is its filename and its URL -- deriving
+    // it from the title would move the page and orphan the original file on the
+    // next publish.
+    const slug = providedSlug || slugify(title);
 
     const insertPost = this.db.prepare(`
       INSERT INTO posts (id, collection, slug, title, body, summary, created_by)

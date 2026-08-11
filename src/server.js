@@ -22,6 +22,7 @@ import { ExportService } from './services/exporter.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogging } from './middleware/logging.js';
 import { rateLimitConfig } from './middleware/rateLimit.js';
+import { resolveCorsOrigin } from './utils/cors.js';
 
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
@@ -95,23 +96,19 @@ await fastify.register(fastifyCookie, {
   secret: config.sessionSecret
 });
 
+// FRONTEND_ORIGINS / ALLOWED_ORIGINS: optional comma-separated list of allowed
+// CORS origins, e.g. "http://localhost:3000,https://app.example.com". Unset means
+// reflect-any in development and same-origin-only in production -- see cors.js.
+const corsOriginsRaw = process.env.FRONTEND_ORIGINS || process.env.ALLOWED_ORIGINS || '';
+
+if (!corsOriginsRaw && config.env === 'production') {
+  logger.warn(
+    'No FRONTEND_ORIGINS set; allowing same-origin requests only. Set it if the frontend is hosted separately.'
+  );
+}
+
 await fastify.register(fastifyCors, {
-  origin: (() => {
-    // FRONTEND_ORIGINS / ALLOWED_ORIGINS:
-    // Optional comma-separated list of allowed CORS origins, e.g.
-    // "http://localhost:3000,https://app.example.com".
-    // If unset or empty, CORS will reflect the request origin.
-    const raw = process.env.FRONTEND_ORIGINS || process.env.ALLOWED_ORIGINS || '';
-    if (!raw) return true; // reflect origin
-    const allowed = raw.split(',').map(s => s.trim()).filter(Boolean);
-    if (allowed.length === 0) return true;
-    if (allowed.length === 1) return allowed[0];
-    return (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (allowed.includes(origin)) return cb(null, true);
-      return cb(null, false);
-    };
-  })(),
+  origin: resolveCorsOrigin(corsOriginsRaw, config.env),
   credentials: true
 });
 

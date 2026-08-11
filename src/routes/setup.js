@@ -1,8 +1,16 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { authenticate } from '../middleware/authenticate.js';
 
 export default async function setupRoutes(fastify) {
-  // Check setup status
+  const { authService } = fastify;
+  const auth = authenticate(authService);
+
+  // Gated per-route rather than with a plugin-wide preHandler hook (the pattern in
+  // routes/tags.js), because /api/setup/status must stay reachable to a logged-out
+  // browser -- it is what decides whether to show the setup wizard at all.
+
+  // Deliberately public: called before any account exists.
   fastify.get('/api/setup/status', async () => {
     const setupComplete = fastify.db
       .prepare("SELECT value FROM config WHERE key = 'setup_complete'")
@@ -18,8 +26,10 @@ export default async function setupRoutes(fastify) {
     };
   });
 
-  // Get collections
-  fastify.get('/api/setup/collections', async () => {
+  // Get collections. Its only caller, PostEditor, is already behind auth, so
+  // gating this costs nothing and stops the site's collection layout being
+  // readable by anyone who can reach the port.
+  fastify.get('/api/setup/collections', { preHandler: auth }, async () => {
     const result = fastify.db
       .prepare("SELECT value FROM config WHERE key = 'collections'")
       .get();
@@ -37,8 +47,11 @@ export default async function setupRoutes(fastify) {
     return { collections };
   });
 
-  // Validate workspace
-  fastify.post('/api/setup/validate', async (request, reply) => {
+  // Validate workspace. Gated because it runs existsSync() on a path supplied in
+  // the request body: unauthenticated, that is a way to ask whether an arbitrary
+  // path exists on the host. Nothing in public/ calls it, so gating it cannot
+  // break the setup wizard.
+  fastify.post('/api/setup/validate', { preHandler: auth }, async (request, reply) => {
     const { workspacePath } = request.body || {};
     const wsPath = workspacePath || '/workspace';
 
