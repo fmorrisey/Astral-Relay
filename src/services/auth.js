@@ -93,6 +93,37 @@ export class AuthService {
     return true;
   }
 
+  /**
+   * Change a password, having proven the current one.
+   *
+   * @param keepSessionId session to leave alive -- the one making the request.
+   *   Every other session is dropped: a password change is how someone revokes
+   *   access from a device they no longer control, which does nothing if those
+   *   sessions keep working. Dropping this one too would sign the user out of
+   *   the tab they just used, which reads as a failure.
+   * @returns {Promise<{ok: boolean, revoked?: number}>}
+   */
+  async changePassword(userId, currentPassword, newPassword, keepSessionId = null) {
+    const user = this.db.prepare('SELECT id, password_hash FROM users WHERE id = ?').get(userId);
+    if (!user) return { ok: false };
+
+    const valid = await this.verifyPassword(user.password_hash, currentPassword);
+    if (!valid) return { ok: false };
+
+    const passwordHash = await this.hashPassword(newPassword);
+
+    let revoked = 0;
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, user.id);
+
+      revoked = this.db.prepare(
+        'DELETE FROM sessions WHERE user_id = ? AND id IS NOT ?'
+      ).run(user.id, keepSessionId).changes;
+    })();
+
+    return { ok: true, revoked };
+  }
+
   createSession(userId, userAgent = null, ipAddress = null) {
     const sessionId = randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

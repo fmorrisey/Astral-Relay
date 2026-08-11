@@ -231,6 +231,9 @@ astral-relay/
 | `POST` | `/api/auth/login` | Login |
 | `POST` | `/api/auth/logout` | Logout |
 | `GET` | `/api/auth/me` | Current user |
+| `POST` | `/api/auth/change-password` | Change password (signs out other devices) |
+| `POST` | `/api/auth/recovery-code` | Issue a recovery code, shown once |
+| `POST` | `/api/auth/recover` | Redeem a recovery code to reset a password |
 
 ### Posts
 | Method | Path | Description |
@@ -376,3 +379,11 @@ or otherwise use any part of this repository.
 This repository contains original written content, photographs, designs,
 and other creative works owned exclusively by the author. Any use without
 explicit written permission is prohibited.
+
+### Changing your password
+
+Settings (top right) → **Change password**. You need your current password.
+Every other signed-in device is signed out; the one you are using stays in.
+
+The same screen generates a recovery code, which is how accounts created before
+recovery codes existed get their first one.
