@@ -322,6 +322,38 @@ Configuration is via environment variables (see `.env.example`):
 2. ✅ File type is JPEG, PNG, WebP, or GIF
 3. ✅ Workspace is mounted (images save to `workspace/public/media/`)
 
+### Locked out — forgotten password
+
+Two routes back in, in order of preference:
+
+**1. Recovery code.** On the sign-in screen, choose **Use a recovery code**, then
+enter your username, the code, and a new password. Codes are single-use, and
+redeeming one signs out every existing session.
+
+**2. Reset from the server**, if you have no code or have lost it:
+
+```bash
+npm run reset-password -- <username>
+```
+
+It prompts for the new password (hidden), never takes it as an argument, and
+invalidates existing sessions. No restart needed.
+
+### Recovery codes
+
+You are shown a code once, at setup. Only its hash is stored, so it cannot be
+displayed again — save it somewhere.
+
+Accounts created before recovery codes were stored have none. To issue one while
+signed in:
+
+```bash
+curl -X POST http://localhost:3031/api/auth/recovery-code -b 'session=<your session cookie>'
+```
+
+Issuing a new code invalidates the previous one, so there is exactly one live
+code per account.
+
 ### Docker container unhealthy
 
 **Check logs:**

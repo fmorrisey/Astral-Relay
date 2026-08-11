@@ -36,6 +36,15 @@ export const schemas = {
 
   createTag: Joi.object({
     name: Joi.string().min(1).max(50).required()
+  }),
+
+  recover: Joi.object({
+    username: Joi.string().alphanum().min(3).max(30).required(),
+    // Format is RELAY-XXXX-XXXX-XXXX. Not pattern-matched here: a rejection
+    // shaped differently from "wrong code" would tell an attacker when they had
+    // the format right, and the check costs nothing at redemption time.
+    recoveryCode: Joi.string().max(64).required(),
+    newPassword: Joi.string().min(8).required()
   })
 };
 

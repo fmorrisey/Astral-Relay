@@ -256,6 +256,16 @@ select:focus {
   font-size: 14px;
 }
 
+/* Success counterpart to .error, e.g. after redeeming a recovery code. */
+.login-form .notice {
+  background: #e4f7ea;
+  color: var(--success);
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
 /* Editor */
 .editor-container {
   padding-bottom: 80px;

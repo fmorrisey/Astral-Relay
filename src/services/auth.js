@@ -31,6 +31,68 @@ export class AuthService {
     return `RELAY-${parts.join('-')}`;
   }
 
+  /**
+   * Issue a recovery code for a user and store only its hash.
+   *
+   * Returns the plaintext, which is the single opportunity to see it. Any
+   * previously issued code stops working immediately -- one live code per
+   * account, so a leaked older one cannot be redeemed later.
+   *
+   * @returns {Promise<string>} the plaintext code
+   */
+  async issueRecoveryCode(userId) {
+    const code = this.generateRecoveryCode();
+    const hash = await this.hashPassword(code);
+
+    this.db.prepare(`
+      UPDATE users
+      SET recovery_code_hash = ?, recovery_code_set_at = datetime('now')
+      WHERE id = ?
+    `).run(hash, userId);
+
+    return code;
+  }
+
+  /**
+   * Redeem a recovery code, setting a new password.
+   *
+   * Deliberately does the same amount of work whether or not the user exists
+   * and whether or not a code is set, so response timing does not reveal which
+   * usernames are real or which accounts have recovery configured.
+   *
+   * @returns {Promise<boolean>} whether the code was accepted
+   */
+  async redeemRecoveryCode(username, code, newPassword) {
+    const user = this.db
+      .prepare('SELECT id, recovery_code_hash FROM users WHERE username = ?')
+      .get(username);
+
+    // Verify against a throwaway hash when there is nothing to check, so the
+    // argon2 cost is paid either way.
+    const hash = user?.recovery_code_hash || await this.hashPassword(randomBytes(16).toString('hex'));
+    const valid = await this.verifyPassword(hash, code);
+
+    if (!user || !user.recovery_code_hash || !valid) return false;
+
+    const passwordHash = await this.hashPassword(newPassword);
+
+    // One transaction: a redemption must not be able to land as a new password
+    // with the code still live, or a cleared code with the old password.
+    this.db.transaction(() => {
+      this.db.prepare(`
+        UPDATE users
+        SET password_hash = ?, recovery_code_hash = NULL, recovery_code_set_at = NULL
+        WHERE id = ?
+      `).run(passwordHash, user.id);
+
+      // Whoever redeemed the code owns the account now; existing sessions
+      // belong to whoever had it before.
+      this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+    })();
+
+    return true;
+  }
+
   createSession(userId, userAgent = null, ipAddress = null) {
     const sessionId = randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
