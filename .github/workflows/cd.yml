@@ -3,9 +3,11 @@ name: CD
 on:
   push:
     branches: [ main ]
+  # Manual re-run, for when a deploy needs repeating without a new commit.
+  workflow_dispatch:
 
-# One deploy at a time. Two overlapping runs would race on the same working
-# copy and the same container.
+# One deploy at a time. Two overlapping runs would race on the same working copy
+# and the same container.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -13,70 +15,54 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to Rainier
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
-      # Deliberately no actions/checkout. It clones into the runner's _work
-      # directory, and deploying from there would use a tree with no .env (it is
-      # gitignored) and a different ./data -- so the compose file would either
-      # fail on the required HOST_WORKSPACE_PATH or mount an empty database
-      # directory as the volume. The deployment lives in one known place; this
-      # updates that place.
-      - name: Update the deployment checkout
-        env:
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-        run: |
-          set -euo pipefail
-          if [ -z "${DEPLOY_PATH}" ]; then
-            echo "::error::DEPLOY_PATH repository variable is not set."
-            echo "Set it to the directory holding the deployment (the one with .env and data/)."
-            exit 1
-          fi
-          cd "${DEPLOY_PATH}"
-          git fetch --prune origin
-          # Reset rather than pull: the deploy tree is a mirror of main, not a
-          # place to hold work, and this survives a force-push. Gitignored files
-          # -- .env, data/ -- are untouched.
-          git reset --hard origin/main
-          git log --oneline -1
+      # A GitHub-hosted runner rather than a self-hosted one. This repository is
+      # public, and a self-hosted runner would put workflow code proposed by pull
+      # requests on the machine that holds the tailnet, the site source and the
+      # database. Nothing untrusted runs on the target here -- the runner only
+      # opens an SSH connection to it.
+      #
+      # The host has no public route: rainierserver.com resolves to Cloudflare,
+      # and its SSH is reachable only over the tailnet. So the runner joins the
+      # tailnet as an ephemeral node for the length of the job.
+      - name: Join the tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
 
-      - name: Build and restart
+      - name: Deploy over SSH
         env:
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
         run: |
           set -euo pipefail
-          cd "${DEPLOY_PATH}"
-          docker compose up -d --build
 
-      # A container that starts is not the same as one that works: pending
-      # migrations run on boot, so a bad migration shows up here and nowhere
-      # earlier. Without this the workflow goes green on a broken deploy.
-      - name: Wait for health
-        env:
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-        run: |
-          set -euo pipefail
-          cd "${DEPLOY_PATH}"
-          for attempt in $(seq 1 30); do
-            status=$(curl -sf -m 5 http://127.0.0.1:3031/api/health || true)
-            case "${status}" in
-              *'"status":"healthy"'*)
-                echo "${status}"
-                case "${status}" in
-                  *'"workspace":"mounted"'*) exit 0 ;;
-                  *) echo "::error::Healthy but workspace is not mounted - check HOST_WORKSPACE_PATH in .env"; exit 1 ;;
-                esac
-                ;;
-            esac
-            sleep 2
+          for required in DEPLOY_HOST DEPLOY_USER; do
+            if [ -z "${!required:-}" ]; then
+              echo "::error::$required is not set. See 'Continuous deployment' in the README."
+              exit 1
+            fi
           done
-          echo "::error::Service did not become healthy within 60s"
-          docker compose logs --tail 50
-          exit 1
 
-      - name: Clean up old images
-        run: docker image prune -f
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
 
-      - name: Show running containers
-        env:
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-        run: cd "${DEPLOY_PATH}" && docker compose ps
+          # Pin the host key. The alternative, StrictHostKeyChecking=no, would
+          # hand the deploy key to whatever answers on that address.
+          printf '%s\n' "$DEPLOY_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          # The command sent is ignored: the key is pinned to a forced command in
+          # authorized_keys, so this connection can only run a deploy and not a
+          # shell. Sending one anyway keeps the intent readable in the logs.
+          ssh -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=30 \
+              "$DEPLOY_USER@$DEPLOY_HOST" astral-relay-deploy
