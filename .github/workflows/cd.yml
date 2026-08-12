@@ -17,6 +17,26 @@ jobs:
     name: Deploy to Rainier
     runs-on: ubuntu-latest
     steps:
+      # Checked before the tailnet step so a missing credential says what to do,
+      # rather than surfacing as an authentication failure from inside an action.
+      - name: Check deploy credentials are configured
+        env:
+          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          missing=()
+          for name in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET DEPLOY_SSH_KEY DEPLOY_HOST_KEY; do
+            [ -z "${!name:-}" ] && missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing repository secrets: ${missing[*]}"
+            echo "See 'Continuous deployment' in the README. The Tailscale pair comes from an"
+            echo "OAuth client with the auth_keys scope, owning the tag:ci ACL tag."
+            exit 1
+          fi
+
       # A GitHub-hosted runner rather than a self-hosted one. This repository is
       # public, and a self-hosted runner would put workflow code proposed by pull
       # requests on the machine that holds the tailnet, the site source and the
