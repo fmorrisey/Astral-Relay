@@ -10,7 +10,7 @@ export class AstroExporter {
     this.collections = collections || [];
   }
 
-  async exportPost(post, tags = [], media = []) {
+  async exportPost(post, tags = [], media = null) {
     try {
       const filePath = join(
         this.workspaceRoot,
@@ -25,7 +25,7 @@ export class AstroExporter {
       // optional in an Astro schema, so the site would still build and simply
       // render without them. Carry them through instead.
       const existing = this._readExistingFrontmatter(filePath);
-      const frontmatter = this._generateFrontmatter(post, tags, existing);
+      const frontmatter = this._generateFrontmatter(post, tags, existing, media);
       const content = `---\n${frontmatter}---\n\n${post.body}\n`;
 
       await this._ensureDirectory(dirname(filePath));
@@ -33,16 +33,10 @@ export class AstroExporter {
 
       logger.info(`Exported: ${filePath}`);
 
-      let copiedMedia = 0;
-      for (const m of media) {
-        await this._copyMedia(m);
-        copiedMedia++;
-      }
-
       return {
         success: true,
         filePath: filePath.replace(this.workspaceRoot, ''),
-        mediaFiles: copiedMedia
+        images: Object.keys(this._imageFields(media)).length
       };
     } catch (error) {
       logger.error({ error: error.message }, 'Export failed');
@@ -90,7 +84,32 @@ export class AstroExporter {
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   }
 
-  _generateFrontmatter(post, tags, existing = {}) {
+  /**
+   * Image fields, added only when the CMS actually holds a value.
+   *
+   * Deliberately not written when unset. #17 established that keys the CMS does
+   * not model are preserved, and every entry imported from an existing site has
+   * a hand-written heroImage or gallery that the CMS does not know about yet.
+   * Writing empty values for those would erase them on the first publish --
+   * turning a fix for silent data loss into a new source of it.
+   *
+   * The consequence is that clearing a hero has to be done in the file. That is
+   * the safer direction to be wrong in.
+   */
+  _imageFields(media) {
+    if (!media) return {};
+
+    const fields = {};
+    if (media.hero) fields.heroImage = media.hero.url;
+    if (media.cover) fields.coverImage = media.cover.url;
+    if (media.gallery?.length) {
+      fields.gallery = media.gallery.map(item => ({ src: item.url, alt: item.alt || '' }));
+    }
+
+    return fields;
+  }
+
+  _generateFrontmatter(post, tags, existing = {}, media = null) {
     // The keys this CMS owns and will always rewrite. Everything else in
     // `existing` is passed through untouched.
     const owned = {
@@ -102,7 +121,9 @@ export class AstroExporter {
       // overwritten -- it is not a field this CMS models.
       summary: post.summary || '',
       tags: tags.map(t => typeof t === 'string' ? t : t.name),
-      published: post.status === 'published'
+      published: post.status === 'published',
+      // Only present when set; see _imageFields.
+      ...this._imageFields(media)
     };
 
     // Spread order matters: keys already in the file keep their original
@@ -118,13 +139,6 @@ export class AstroExporter {
       lineWidth: -1,
       noRefs: true
     });
-  }
-
-  async _copyMedia(media) {
-    const sourcePath = join(this.workspaceRoot, 'public', media.storage_path || media.storagePath);
-    if (!existsSync(sourcePath)) {
-      logger.warn(`Media file not found: ${sourcePath}`);
-    }
   }
 
   async _ensureDirectory(dirPath) {

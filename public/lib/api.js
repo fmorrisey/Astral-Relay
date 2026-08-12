@@ -45,6 +45,8 @@ export const api = {
   publishPost: (id, data) => api.request(`/posts/${id}/publish`, { method: 'POST', body: JSON.stringify(data || {}) }),
   unpublishPost: (id) => api.request(`/posts/${id}/unpublish`, { method: 'POST', body: JSON.stringify({}) }),
   getVersions: (id) => api.request(`/posts/${id}/versions`),
+  getPostMedia: (id) => api.request(`/posts/${id}/media`),
+  setPostMedia: (id, data) => api.request(`/posts/${id}/media`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Media
   getMedia: (params = {}) => api.request(`/media?${new URLSearchParams(params)}`),

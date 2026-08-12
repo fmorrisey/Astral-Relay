@@ -1,5 +1,6 @@
 import { html, useState, useEffect, useRef } from 'https://esm.sh/htm/preact/standalone';
 import { api } from '../lib/api.js';
+import { PostImages } from './PostImages.js';
 
 export function PostEditor({ postId }) {
   const [post, setPost] = useState({
@@ -225,6 +226,9 @@ export function PostEditor({ postId }) {
           `)}
         </div>
       </div>
+
+      ${/* Associations need a post id, so this appears once the draft is saved. */ ''}
+      ${!isNew && html`<${PostImages} postId=${postId} />`}
 
       <div class="action-bar">
         ${!isNew && html`

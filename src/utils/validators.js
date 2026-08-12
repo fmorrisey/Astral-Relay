@@ -34,6 +34,16 @@ export const schemas = {
     }).optional()
   }),
 
+  setPostMedia: Joi.object({
+    // null clears a slot; omitting the key leaves it as it is.
+    heroMediaId: Joi.string().allow(null).optional(),
+    coverMediaId: Joi.string().allow(null).optional(),
+    gallery: Joi.array().items(Joi.object({
+      mediaId: Joi.string().required(),
+      alt: Joi.string().max(300).allow('').optional()
+    })).max(100).optional()
+  }),
+
   createTag: Joi.object({
     name: Joi.string().min(1).max(50).required()
   }),

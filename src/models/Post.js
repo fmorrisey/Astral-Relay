@@ -167,6 +167,80 @@ export class Post {
     return this.findById(id);
   }
 
+  /**
+   * Replace a post's image associations in one shot.
+   *
+   * Whole-set replacement rather than incremental add/remove: the editor sends
+   * the gallery it wants, and diffing on the client is how ordering bugs get in.
+   *
+   * @param {{heroMediaId?: string|null, coverMediaId?: string|null,
+   *          gallery?: {mediaId: string, alt?: string}[]}} media
+   */
+  setMedia(id, { heroMediaId, coverMediaId, gallery } = {}) {
+    const setSlots = [];
+    const params = [];
+    if (heroMediaId !== undefined) { setSlots.push('hero_media_id = ?'); params.push(heroMediaId || null); }
+    if (coverMediaId !== undefined) { setSlots.push('cover_media_id = ?'); params.push(coverMediaId || null); }
+
+    this.db.transaction(() => {
+      if (setSlots.length > 0) {
+        this.db.prepare(`UPDATE posts SET ${setSlots.join(', ')} WHERE id = ?`).run(...params, id);
+      }
+
+      if (gallery !== undefined) {
+        this.db.prepare('DELETE FROM post_media WHERE post_id = ?').run(id);
+        const insert = this.db.prepare(`
+          INSERT INTO post_media (post_id, media_id, sort_order, alt_text)
+          VALUES (?, ?, ?, ?)
+        `);
+        gallery.forEach((item, index) => {
+          insert.run(id, item.mediaId, index, item.alt || null);
+        });
+      }
+    })();
+
+    return this.getMedia(id);
+  }
+
+  /**
+   * A post's images: the two slots, and the ordered gallery.
+   *
+   * Gallery alt falls back to the image's own alt text, so a caption set once at
+   * upload still applies unless this post overrides it.
+   */
+  getMedia(id) {
+    const post = this.db
+      .prepare('SELECT hero_media_id, cover_media_id FROM posts WHERE id = ?')
+      .get(id);
+    if (!post) return null;
+
+    const gallery = this.db.prepare(`
+      SELECT m.*, pm.alt_text AS use_alt, pm.sort_order
+      FROM post_media pm
+      JOIN media m ON m.id = pm.media_id
+      WHERE pm.post_id = ?
+      ORDER BY pm.sort_order ASC
+    `).all(id).map(row => ({
+      id: row.id,
+      url: `/${row.storage_path}`,
+      width: row.width,
+      height: row.height,
+      alt: row.use_alt || row.alt_text || ''
+    }));
+
+    const slot = mediaId => {
+      if (!mediaId) return null;
+      const m = this.db.prepare('SELECT * FROM media WHERE id = ?').get(mediaId);
+      return m ? { id: m.id, url: `/${m.storage_path}`, width: m.width, height: m.height, alt: m.alt_text || '' } : null;
+    };
+
+    return {
+      hero: slot(post.hero_media_id),
+      cover: slot(post.cover_media_id),
+      gallery
+    };
+  }
+
   delete(id) {
     this.db.prepare('DELETE FROM posts WHERE id = ?').run(id);
   }
@@ -235,6 +309,8 @@ export class Post {
       updatedAt: post.updated_at,
       publishedAt: post.published_at,
       createdBy: post.created_by,
+      heroMediaId: post.hero_media_id || null,
+      coverMediaId: post.cover_media_id || null,
       authorName: post.author_name,
       tags: (post.tags || []).map(t => t.name)
     };

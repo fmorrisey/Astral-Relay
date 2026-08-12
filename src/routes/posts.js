@@ -125,10 +125,12 @@ export default async function postRoutes(fastify) {
     const timestamp = publishedAt || new Date().toISOString();
     const raw = fastify.db.prepare('SELECT * FROM posts WHERE id = ?').get(request.params.id);
     const tags = postModel._getPostTags(request.params.id);
+    const media = postModel.getMedia(request.params.id);
 
     const exported = await exportService.publishPost(
       { ...raw, status: 'published', published_at: timestamp },
-      tags
+      tags,
+      media
     );
 
     const post = postModel.publish(request.params.id, timestamp);
@@ -171,6 +173,54 @@ export default async function postRoutes(fastify) {
     });
 
     return { success: true, post: updatedPost };
+  });
+
+  // A post's images: the hero and cover slots plus the ordered gallery.
+  fastify.get('/api/posts/:id/media', async (request, reply) => {
+    const media = postModel.getMedia(request.params.id);
+    if (!media) {
+      return reply.status(404).send({ error: 'Post not found' });
+    }
+    return { media };
+  });
+
+  // Replace them. Whole-set replacement: the editor sends the gallery it wants,
+  // rather than a diff, because ordering bugs live in client-side diffing.
+  fastify.put('/api/posts/:id/media', async (request, reply) => {
+    const post = postModel.findById(request.params.id);
+    if (!post) {
+      return reply.status(404).send({ error: 'Post not found' });
+    }
+    if (denyIfNotOwner(request, reply, post)) return reply;
+
+    const data = validate(schemas.setPostMedia, request.body);
+
+    // Every referenced image must exist, checked before writing anything: a
+    // gallery half-applied because one id was stale is worse than a rejection.
+    const ids = [
+      data.heroMediaId,
+      data.coverMediaId,
+      ...(data.gallery || []).map(g => g.mediaId)
+    ].filter(Boolean);
+
+    for (const id of ids) {
+      if (!fastify.mediaModel.findById(id)) {
+        return reply.status(400).send({ error: `No such media: ${id}` });
+      }
+    }
+
+    const media = postModel.setMedia(request.params.id, data);
+
+    fastify.logActivity({
+      userId: request.user.id,
+      action: 'post.media.set',
+      resourceType: 'post',
+      resourceId: request.params.id,
+      metadata: { gallery: media.gallery.length, hero: Boolean(media.hero) },
+      ipAddress: request.ip
+    });
+
+    return { success: true, media };
   });
 
   // Get version history
