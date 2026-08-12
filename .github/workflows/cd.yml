@@ -4,21 +4,79 @@ on:
   push:
     branches: [ main ]
 
+# One deploy at a time. Two overlapping runs would race on the same working
+# copy and the same container.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    name: Deploy to Rainier
     runs-on: self-hosted
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      # Deliberately no actions/checkout. It clones into the runner's _work
+      # directory, and deploying from there would use a tree with no .env (it is
+      # gitignored) and a different ./data -- so the compose file would either
+      # fail on the required HOST_WORKSPACE_PATH or mount an empty database
+      # directory as the volume. The deployment lives in one known place; this
+      # updates that place.
+      - name: Update the deployment checkout
+        env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_PATH}" ]; then
+            echo "::error::DEPLOY_PATH repository variable is not set."
+            echo "Set it to the directory holding the deployment (the one with .env and data/)."
+            exit 1
+          fi
+          cd "${DEPLOY_PATH}"
+          git fetch --prune origin
+          # Reset rather than pull: the deploy tree is a mirror of main, not a
+          # place to hold work, and this survives a force-push. Gitignored files
+          # -- .env, data/ -- are untouched.
+          git reset --hard origin/main
+          git log --oneline -1
 
-      - name: Pull latest changes
-        run: git pull origin main
+      - name: Build and restart
+        env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          cd "${DEPLOY_PATH}"
+          docker compose up -d --build
 
-      - name: Build and restart containers
-        run: docker compose up -d --build
+      # A container that starts is not the same as one that works: pending
+      # migrations run on boot, so a bad migration shows up here and nowhere
+      # earlier. Without this the workflow goes green on a broken deploy.
+      - name: Wait for health
+        env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          cd "${DEPLOY_PATH}"
+          for attempt in $(seq 1 30); do
+            status=$(curl -sf -m 5 http://127.0.0.1:3031/api/health || true)
+            case "${status}" in
+              *'"status":"healthy"'*)
+                echo "${status}"
+                case "${status}" in
+                  *'"workspace":"mounted"'*) exit 0 ;;
+                  *) echo "::error::Healthy but workspace is not mounted - check HOST_WORKSPACE_PATH in .env"; exit 1 ;;
+                esac
+                ;;
+            esac
+            sleep 2
+          done
+          echo "::error::Service did not become healthy within 60s"
+          docker compose logs --tail 50
+          exit 1
 
       - name: Clean up old images
         run: docker image prune -f
 
       - name: Show running containers
-        run: docker compose ps
+        env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: cd "${DEPLOY_PATH}" && docker compose ps
