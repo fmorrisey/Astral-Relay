@@ -18,6 +18,7 @@ import { Media } from './models/Media.js';
 import { Tag } from './models/Tag.js';
 import { AuthService } from './services/auth.js';
 import { StorageService } from './services/storage.js';
+import { ThumbnailService } from './services/thumbnails.js';
 import { ExportService } from './services/exporter.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogging } from './middleware/logging.js';
@@ -59,6 +60,12 @@ const mediaModel = new Media(db);
 const tagModel = new Tag(db);
 const authService = new AuthService(db);
 const storageService = new StorageService(config.workspacePath);
+// Thumbnails live beside the database, not in the workspace: the workspace is
+// the user's site and everything in it gets published.
+const thumbnailService = new ThumbnailService({
+  workspacePath: config.workspacePath,
+  thumbnailDir: join(dataDir, 'thumbnails')
+});
 const exportService = new ExportService({
   workspacePath: config.workspacePath,
   collections
@@ -90,6 +97,7 @@ fastify.decorate('mediaModel', mediaModel);
 fastify.decorate('tagModel', tagModel);
 fastify.decorate('authService', authService);
 fastify.decorate('storageService', storageService);
+fastify.decorate('thumbnailService', thumbnailService);
 fastify.decorate('exportService', exportService);
 fastify.decorate('logActivity', logActivity);
 

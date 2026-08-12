@@ -48,6 +48,10 @@ export const schemas = {
   // fields and strip hand-written ones on the next publish.
   }).min(1),
 
+  updateMedia: Joi.object({
+    altText: Joi.string().max(300).allow('', null).required()
+  }),
+
   createTag: Joi.object({
     name: Joi.string().min(1).max(50).required()
   }),

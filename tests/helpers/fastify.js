@@ -9,6 +9,7 @@ import { Media } from '../../src/models/Media.js';
 import { Tag } from '../../src/models/Tag.js';
 import { AuthService } from '../../src/services/auth.js';
 import { StorageService } from '../../src/services/storage.js';
+import { ThumbnailService } from '../../src/services/thumbnails.js';
 import { ExportService } from '../../src/services/exporter.js';
 
 import healthRoutes from '../../src/routes/health.js';
@@ -32,6 +33,10 @@ export async function buildFastify(options = {}) {
   const tagModel = new Tag(db);
   const authService = new AuthService(db);
   const storageService = new StorageService('/tmp/test-workspace');
+  const thumbnailService = new ThumbnailService({
+    workspacePath: '/tmp/test-workspace',
+    thumbnailDir: '/tmp/test-workspace/.thumbnails'
+  });
   const exportService = new ExportService({
     workspacePath: '/tmp/test-workspace',
     collections: ['blog']
@@ -68,6 +73,7 @@ export async function buildFastify(options = {}) {
   fastify.decorate('tagModel', tagModel);
   fastify.decorate('authService', authService);
   fastify.decorate('storageService', storageService);
+  fastify.decorate('thumbnailService', thumbnailService);
   fastify.decorate('exportService', exportService);
   fastify.decorate('logActivity', logActivity);
 

@@ -21,11 +21,17 @@ export class Media {
     return media ? this._format(media) : null;
   }
 
-  list({ limit = 50, offset = 0 } = {}) {
-    const total = this.db.prepare('SELECT COUNT(*) as count FROM media').get().count;
+  list({ limit = 50, offset = 0, search = '' } = {}) {
+    // LIKE with escaped wildcards: a filename containing % or _ should match
+    // itself, not everything.
+    const term = String(search).trim();
+    const where = term ? "WHERE original_filename LIKE ? ESCAPE '\\'" : '';
+    const params = term ? [`%${term.replace(/[\\%_]/g, c => '\\' + c)}%`] : [];
+
+    const total = this.db.prepare(`SELECT COUNT(*) as count FROM media ${where}`).get(...params).count;
     const items = this.db.prepare(
-      'SELECT * FROM media ORDER BY created_at DESC LIMIT ? OFFSET ?'
-    ).all(limit, offset);
+      `SELECT * FROM media ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
 
     return {
       media: items.map(m => this._format(m)),
@@ -33,6 +39,11 @@ export class Media {
       limit,
       offset
     };
+  }
+
+  updateAltText(id, altText) {
+    this.db.prepare('UPDATE media SET alt_text = ? WHERE id = ?').run(altText || null, id);
+    return this.findById(id);
   }
 
   delete(id) {
@@ -60,6 +71,12 @@ export class Media {
       height: media.height,
       storagePath: media.storage_path,
       url: `/${media.storage_path}`,
+      // Served by the CMS, not from the site: thumbnails are an artifact of this
+      // application and do not belong in the published output.
+      thumbnailUrl: `/api/media/${media.id}/thumbnail`,
+      // The original, served by this app. Distinct from `url`, which is the
+      // path on the published site and does not resolve here.
+      fileUrl: `/api/media/${media.id}/file`,
       altText: media.alt_text,
       createdAt: media.created_at
     };
