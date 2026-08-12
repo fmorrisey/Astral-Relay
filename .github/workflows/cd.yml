@@ -53,6 +53,26 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
+      # The step above cannot be relied on to fail. It retries `tailscale up` in a
+      # loop whose last command is a `sleep`, so when every attempt fails -- a 403
+      # from an OAuth client missing the auth_keys scope, say -- the loop still
+      # exits 0 and the step is reported green. The deploy then dies further along
+      # at an SSH connection timeout, which says nothing about the real cause.
+      - name: Verify the tailnet connection came up
+        run: |
+          set -euo pipefail
+
+          # Tolerate the binary being absent or the daemon not answering: an
+          # empty state falls through to the same readable failure below.
+          state="$(tailscale status --json 2>/dev/null | jq -r '.BackendState' || true)"
+          if [ "$state" != "Running" ]; then
+            echo "::error::Not connected to the tailnet (BackendState=$state)."
+            echo "Read the retry output of 'Join the tailnet' above. A 403 there"
+            echo "means the Tailscale OAuth client either lacks the writable"
+            echo "auth_keys scope or does not own tag:ci."
+            exit 1
+          fi
+
       - name: Deploy over SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
