@@ -135,6 +135,88 @@ describe('AstroExporter', () => {
     });
   });
 
+  describe('image fields', () => {
+    const media = {
+      managed: true,
+      hero: { id: 'h', url: '/media/2026/08/hero.jpg', alt: '' },
+      cover: null,
+      gallery: [
+        { id: 'g1', url: '/media/2026/08/one.jpg', alt: 'First' },
+        { id: 'g2', url: '/media/2026/08/two.jpg', alt: '' }
+      ]
+    };
+
+    it('writes hero and gallery when the CMS has them', async () => {
+      await exporter.exportPost(post(), [], media);
+
+      const fm = frontmatterOf();
+      assert.strictEqual(fm.heroImage, '/media/2026/08/hero.jpg');
+      assert.deepStrictEqual(fm.gallery, [
+        { src: '/media/2026/08/one.jpg', alt: 'First' },
+        { src: '/media/2026/08/two.jpg', alt: '' }
+      ]);
+    });
+
+    it('omits a slot the CMS has not set, rather than writing an empty one', async () => {
+      await exporter.exportPost(post(), [], media);
+      assert.ok(!('coverImage' in frontmatterOf()));
+    });
+
+    // The case that matters: every imported entry has a hand-written heroImage
+    // the CMS knows nothing about. Writing empty values would erase them on the
+    // first publish -- turning the #17 fix into a new source of the same loss.
+    it('leaves a hand-written heroImage alone when the CMS has none', async () => {
+      writeExisting({
+        title: 'Old', date: '2020-09-11', published: true,
+        heroImage: '/media/hand-written.jpg',
+        gallery: [{ src: '/media/hand.jpg', alt: 'By hand' }]
+      });
+
+      await exporter.exportPost(post(), [], null);
+
+      const fm = frontmatterOf();
+      assert.strictEqual(fm.heroImage, '/media/hand-written.jpg');
+      assert.deepStrictEqual(fm.gallery, [{ src: '/media/hand.jpg', alt: 'By hand' }]);
+    });
+
+    // Once the CMS manages a post's images, absent means "there is none" --
+    // otherwise clearing a hero, or deleting the image behind it, left a path in
+    // frontmatter pointing at something that no longer exists, which fails an
+    // Astro image() schema and could only be fixed by editing the file.
+    it('removes a field the CMS manages but no longer has', async () => {
+      writeExisting({
+        title: 'Old', date: '2020-09-11', published: true,
+        heroImage: '/media/2026/08/hero.jpg'
+      });
+
+      await exporter.exportPost(post(), [], { hero: null, cover: null, gallery: [], managed: true });
+
+      assert.ok(!('heroImage' in frontmatterOf()));
+    });
+
+    it('still leaves it alone when the CMS does not manage the post', async () => {
+      writeExisting({
+        title: 'Old', date: '2020-09-11', published: true,
+        heroImage: '/media/hand-written.jpg'
+      });
+
+      await exporter.exportPost(post(), [], { hero: null, cover: null, gallery: [], managed: false });
+
+      assert.strictEqual(frontmatterOf().heroImage, '/media/hand-written.jpg');
+    });
+
+    it('overwrites a hand-written value once the CMS does have one', async () => {
+      writeExisting({
+        title: 'Old', date: '2020-09-11', published: true,
+        heroImage: '/media/hand-written.jpg'
+      });
+
+      await exporter.exportPost(post(), [], media);
+
+      assert.strictEqual(frontmatterOf().heroImage, '/media/2026/08/hero.jpg');
+    });
+  });
+
   describe('when the existing file cannot be parsed', () => {
     it('refuses to overwrite rather than discarding its keys', async () => {
       writeFileSync(fileAt(), '---\ntitle: "unterminated\n  bad: [1, 2\n---\n\nBody.\n');

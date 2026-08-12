@@ -85,7 +85,13 @@ function convertString(described) {
   if (described.allow) {
     // Joi's .valid() marks the schema "only"; .allow() merely permits extras.
     if (described.flags?.only) schema.enum = described.allow;
-    else if (described.allow.includes('')) schema.minLength = 0;
+    else {
+      if (described.allow.includes('')) schema.minLength = 0;
+      // OpenAPI 3.0 spells nullability as a keyword rather than a type union.
+      // Dropping it advertised a non-nullable string for a field whose null is
+      // the documented way to clear it.
+      if (described.allow.includes(null)) schema.nullable = true;
+    }
   }
 
   return withMeta(described, schema);

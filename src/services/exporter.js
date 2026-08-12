@@ -9,7 +9,7 @@ export class ExportService {
     this.gitExporter = config.gitSyncEnabled ? new GitExporter(workspacePath) : null;
   }
 
-  async publishPost(post, tags = [], media = []) {
+  async publishPost(post, tags = [], media = null) {
     const result = await this.astroExporter.exportPost(post, tags, media);
 
     // Trigger webhook (non-blocking)

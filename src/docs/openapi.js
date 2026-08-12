@@ -265,6 +265,39 @@ export function buildOpenApiDocument({ version }) {
           responses: { 200: json('Unpublished'), 401: ERRORS[401], 403: ERRORS[403], 404: ERRORS[404] }
         }
       },
+      '/api/posts/{id}/media': {
+        get: {
+          tags: ['posts'],
+          summary: 'A post\'s hero, cover, and ordered gallery',
+          parameters: [idParam],
+          responses: {
+            200: json('Post images', {
+              media: {
+                hero: { id: 'uuid', url: '/media/2026/08/a.jpg', width: 2400, height: 1600, alt: '' },
+                cover: null,
+                gallery: [{ id: 'uuid', url: '/media/2026/08/b.jpg', width: 2400, height: 1600, alt: 'On the ridge' }]
+              }
+            }),
+            401: ERRORS[401], 404: ERRORS[404]
+          }
+        },
+        put: {
+          tags: ['posts'],
+          summary: 'Replace a post\'s images',
+          description:
+            'Whole-set replacement: the gallery sent becomes the gallery, in the order given. ' +
+            'Omitting a key leaves it unchanged; null clears a slot. Fields are only written to ' +
+            'frontmatter when set, so a hand-written heroImage in an imported entry is not erased. ' +
+            'Authors may only change their own posts.',
+          parameters: [idParam],
+          requestBody: body('setPostMedia'),
+          responses: {
+            200: json('Updated'),
+            400: json('Validation failed, or an image id does not exist'),
+            401: ERRORS[401], 403: ERRORS[403], 404: ERRORS[404]
+          }
+        }
+      },
       '/api/posts/{id}/versions': {
         get: { tags: ['posts'], summary: 'Version history', parameters: [idParam], responses: { 200: json('Versions'), 401: ERRORS[401], 404: ERRORS[404] } }
       },

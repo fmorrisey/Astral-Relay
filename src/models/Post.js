@@ -74,6 +74,7 @@ export class Post {
       SELECT
         p.id, p.collection, p.slug, p.title, p.summary, p.status,
         p.created_at, p.updated_at, p.published_at,
+        p.hero_media_id, p.cover_media_id,
         u.display_name as author_name
       FROM posts p
       LEFT JOIN users u ON p.created_by = u.id
@@ -167,6 +168,99 @@ export class Post {
     return this.findById(id);
   }
 
+  /**
+   * Replace a post's image associations in one shot.
+   *
+   * Whole-set replacement rather than incremental add/remove: the editor sends
+   * the gallery it wants, and diffing on the client is how ordering bugs get in.
+   *
+   * @param {{heroMediaId?: string|null, coverMediaId?: string|null,
+   *          gallery?: {mediaId: string, alt?: string}[]}} media
+   */
+  setMedia(id, { heroMediaId, coverMediaId, gallery } = {}) {
+    const setSlots = [];
+    const params = [];
+    if (heroMediaId !== undefined) { setSlots.push('hero_media_id = ?'); params.push(heroMediaId || null); }
+    if (coverMediaId !== undefined) { setSlots.push('cover_media_id = ?'); params.push(coverMediaId || null); }
+
+    this.db.transaction(() => {
+      // From here on this post's image fields are the CMS's to write.
+      this.db.prepare('UPDATE posts SET images_managed = 1 WHERE id = ?').run(id);
+
+      if (setSlots.length > 0) {
+        this.db.prepare(`UPDATE posts SET ${setSlots.join(', ')} WHERE id = ?`).run(...params, id);
+      }
+
+      if (gallery !== undefined) {
+        this.db.prepare('DELETE FROM post_media WHERE post_id = ?').run(id);
+        const insert = this.db.prepare(`
+          INSERT INTO post_media (post_id, media_id, sort_order, alt_text)
+          VALUES (?, ?, ?, ?)
+        `);
+        // Deduplicate, keeping the first position. post_media is keyed on
+        // (post_id, media_id), so a repeat is a primary-key violation -- and the
+        // same image twice in one gallery is a mis-click, not an intent.
+        const seen = new Set();
+        let position = 0;
+        for (const item of gallery) {
+          if (seen.has(item.mediaId)) continue;
+          seen.add(item.mediaId);
+          // Empty string is a deliberate "no alt text", distinct from null,
+          // which means "fall back to the image's own". Only undefined defers.
+          const alt = item.alt === undefined ? null : item.alt;
+          insert.run(id, item.mediaId, position++, alt);
+        }
+      }
+    })();
+
+    return this.getMedia(id);
+  }
+
+  /**
+   * A post's images: the two slots, and the ordered gallery.
+   *
+   * Gallery alt falls back to the image's own alt text, so a caption set once at
+   * upload still applies unless this post overrides it.
+   */
+  getMedia(id) {
+    const post = this.db
+      .prepare('SELECT hero_media_id, cover_media_id, images_managed FROM posts WHERE id = ?')
+      .get(id);
+    if (!post) return null;
+
+    const gallery = this.db.prepare(`
+      SELECT m.*, pm.alt_text AS use_alt, pm.sort_order
+      FROM post_media pm
+      JOIN media m ON m.id = pm.media_id
+      WHERE pm.post_id = ?
+      ORDER BY pm.sort_order ASC
+    `).all(id).map(row => ({
+      id: row.id,
+      url: `/${row.storage_path}`,
+      width: row.width,
+      height: row.height,
+      // null means "use the image's own"; empty string is an explicit choice to
+      // have none, so it must not fall through.
+      alt: row.use_alt === null || row.use_alt === undefined ? (row.alt_text || '') : row.use_alt,
+      // Which of the two the caller is looking at, so the editor can write back
+      // an override without silently freezing the inherited value.
+      altIsInherited: row.use_alt === null || row.use_alt === undefined
+    }));
+
+    const slot = mediaId => {
+      if (!mediaId) return null;
+      const m = this.db.prepare('SELECT * FROM media WHERE id = ?').get(mediaId);
+      return m ? { id: m.id, url: `/${m.storage_path}`, width: m.width, height: m.height, alt: m.alt_text || '' } : null;
+    };
+
+    return {
+      hero: slot(post.hero_media_id),
+      cover: slot(post.cover_media_id),
+      gallery,
+      managed: post.images_managed === 1
+    };
+  }
+
   delete(id) {
     this.db.prepare('DELETE FROM posts WHERE id = ?').run(id);
   }
@@ -235,6 +329,8 @@ export class Post {
       updatedAt: post.updated_at,
       publishedAt: post.published_at,
       createdBy: post.created_by,
+      heroMediaId: post.hero_media_id || null,
+      coverMediaId: post.cover_media_id || null,
       authorName: post.author_name,
       tags: (post.tags || []).map(t => t.name)
     };
