@@ -196,6 +196,50 @@ is carried through untouched, so a richer Astro schema survives a publish. If th
 existing frontmatter is not valid YAML, the publish fails rather than replacing
 the file.
 
+## Migrating an existing Astro site
+
+Astral Relay writes five frontmatter keys, and their names may not match what
+your collections already use. Check these before publishing over existing
+content — everything else in a file is preserved, but these five are rewritten.
+
+| Astral Relay writes | Common alternatives | If yours differs |
+|---|---|---|
+| `date` | `pubDate`, `publishDate` | Accept `date` in your zod schema, or rename in content |
+| `published` | `draft` (inverted!) | `draft: true` means `published: false` — the sense flips |
+| `summary` | `description`, `excerpt` | See below |
+| `title` | — | Usually already matches |
+| `tags` | `categories`, `keywords` | Accept `tags`, or map in your layout |
+
+**`draft` deserves attention.** It is the inverse of `published`, so a schema
+expecting `draft` will read a published post as a draft and hide it. Either
+switch the collection to `published`, or derive one from the other in your
+config:
+
+```ts
+// src/content.config.ts — accept both while migrating
+const base = {
+  title: z.string(),
+  date: z.coerce.date(),
+  published: z.boolean().default(true),
+  summary: z.string().optional(),
+  // Old field, still read so pre-existing entries keep working
+  draft: z.boolean().optional(),
+};
+```
+
+**`summary` was previously written as `description`.** If your site reads
+`description` and your entries stopped updating, that is why. Astral Relay now
+writes `summary` and leaves any hand-written `description` untouched — so both
+can coexist, but only `summary` is kept up to date.
+
+**Everything else survives.** `heroImage`, `gallery`, `featured`, `tech`,
+`links`, and any other key already in a file are read back and preserved on
+publish. Only the five keys above are rewritten. If a file's frontmatter is not
+valid YAML, the publish fails rather than replacing it.
+
+The safest order: run `npm run import -- --dry-run`, reconcile field names, then
+import and publish one post to confirm the round trip before doing the rest.
+
 ## First Time Setup
 
 1. Open `http://localhost:3031`
