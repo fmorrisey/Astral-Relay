@@ -38,6 +38,20 @@ describe('Post media', () => {
       { hero: null, cover: null, gallery: [], managed: false });
   });
 
+  // The editor renders these. `url` is the published-site path and resolves to
+  // nothing inside the CMS, which is what made every image in the grid broken.
+  it('returns CMS-servable urls alongside the published-site path', async () => {
+    makeMedia('m1', 'media/2026/08/a.jpg');
+    await req('PUT', `/api/posts/${post.id}/media`, { heroMediaId: 'm1', gallery: [{ mediaId: 'm1' }] });
+
+    const { media } = JSON.parse((await req('GET', `/api/posts/${post.id}/media`)).body);
+
+    assert.strictEqual(media.hero.url, '/media/2026/08/a.jpg');
+    assert.strictEqual(media.hero.thumbnailUrl, '/api/media/m1/thumbnail');
+    assert.strictEqual(media.hero.fileUrl, '/api/media/m1/file');
+    assert.strictEqual(media.gallery[0].thumbnailUrl, '/api/media/m1/thumbnail');
+  });
+
   it('sets the hero and cover slots', async () => {
     const a = makeMedia('m-hero', 'media/2026/08/a.jpg');
     const b = makeMedia('m-cover', 'media/2026/08/b.jpg');

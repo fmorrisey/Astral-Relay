@@ -94,7 +94,9 @@ export function PostImages({ postId, onToast }) {
       <label style="display: block; font-size: 13px; margin-bottom: 4px">${label}</label>
       ${media[name] ? html`
         <div>
-          <img src=${media[name].url} alt="" style="width: 100%; border-radius: var(--radius); display: block" />
+          ${/* thumbnailUrl, not url: `url` is the path on the published site and
+                does not resolve inside the CMS. */ ''}
+          <img src=${media[name].thumbnailUrl} alt="" style="width: 100%; border-radius: var(--radius); display: block" />
           <button class="btn btn-outline btn-sm" style="width: 100%; margin-top: 4px" disabled=${saving}
             onClick=${() => save({ ...media, [name]: null })}>Remove</button>
         </div>
@@ -128,7 +130,7 @@ export function PostImages({ postId, onToast }) {
         </p>
       ` : media.gallery.map((item, index) => html`
         <div key=${item.id} style="display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border)">
-          <img src=${item.url} alt="" style="width: 56px; height: 56px; object-fit: cover; border-radius: 4px" />
+          <img src=${item.thumbnailUrl} alt="" style="width: 56px; height: 56px; object-fit: cover; border-radius: 4px" />
           <input type="text" placeholder=${item.altIsInherited ? 'Alt text (from the image)' : 'Alt text'}
             value=${item.alt} style="flex: 1" disabled=${saving}
             onInput=${e => setAlt(index, e.target.value)}

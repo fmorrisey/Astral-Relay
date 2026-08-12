@@ -236,7 +236,13 @@ export class Post {
       ORDER BY pm.sort_order ASC
     `).all(id).map(row => ({
       id: row.id,
+      // The path on the published site. This is what goes into frontmatter, and
+      // it does NOT resolve inside the CMS -- the static plugin serves this
+      // app's public directory, not the Astro workspace.
       url: `/${row.storage_path}`,
+      // Served by the CMS, for displaying the image in the editor.
+      thumbnailUrl: `/api/media/${row.id}/thumbnail`,
+      fileUrl: `/api/media/${row.id}/file`,
       width: row.width,
       height: row.height,
       // null means "use the image's own"; empty string is an explicit choice to
@@ -250,7 +256,15 @@ export class Post {
     const slot = mediaId => {
       if (!mediaId) return null;
       const m = this.db.prepare('SELECT * FROM media WHERE id = ?').get(mediaId);
-      return m ? { id: m.id, url: `/${m.storage_path}`, width: m.width, height: m.height, alt: m.alt_text || '' } : null;
+      return m ? {
+        id: m.id,
+        url: `/${m.storage_path}`,
+        thumbnailUrl: `/api/media/${m.id}/thumbnail`,
+        fileUrl: `/api/media/${m.id}/file`,
+        width: m.width,
+        height: m.height,
+        alt: m.alt_text || ''
+      } : null;
     };
 
     return {
