@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
-import { mkdtempSync, rmSync, mkdirSync, existsSync, writeFileSync } from 'fs';
+import { mkdtempSync, rmSync, mkdirSync, existsSync, writeFileSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import sharp from 'sharp';
@@ -110,6 +110,38 @@ describe('Media library', () => {
       assert.strictEqual(res.statusCode, 401);
     });
 
+    // The existing coverage missed this: createTestUser defaults to admin, and
+    // admins pass the ownership check regardless of whether it works.
+    it('lets an author edit their OWN media', async () => {
+      const author = createTestUser(app.db, { username: 'writer', role: 'author' });
+      const authorSession = createTestSession(app.db, author.id);
+      insertMedia('m2', 'theirs.jpg', null, author.id);
+
+      const res = await app.inject({
+        method: 'PATCH', url: '/api/media/m2',
+        payload: { altText: 'mine to edit' }, cookies: { session: authorSession }
+      });
+
+      assert.strictEqual(res.statusCode, 200);
+    });
+
+    it('lets an author delete their OWN media', async () => {
+      const author = createTestUser(app.db, { username: 'writer2', role: 'author' });
+      const authorSession = createTestSession(app.db, author.id);
+      insertMedia('m3', 'theirs.jpg', null, author.id);
+
+      const res = await app.inject({
+        method: 'DELETE', url: '/api/media/m3', cookies: { session: authorSession }
+      });
+
+      assert.notStrictEqual(res.statusCode, 403);
+    });
+
+    it('answers 400, not 500, when the body is missing', async () => {
+      const res = await req('PATCH', '/api/media/m1');
+      assert.strictEqual(res.statusCode, 400);
+    });
+
     it("refuses an author editing someone else's media", async () => {
       const other = createTestUser(app.db, { username: 'someoneelse', role: 'author' });
       const otherSession = createTestSession(app.db, other.id);
@@ -199,6 +231,40 @@ describe('ThumbnailService', () => {
 
     assert.strictEqual(second, first);
     assert.strictEqual((await sharp(second).metadata()).size, before);
+  });
+
+  // A half-written file used to look finished, and the route stamps
+  // max-age=31536000, immutable -- so a truncated image would be cached for a
+  // year. Generation now writes to a temp name and renames into place.
+  it('never exposes a partially written thumbnail', async () => {
+    const storagePath = await writeSource('concurrent.jpg', 2400, 1600);
+
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => service.ensure({ id: 'race', storagePath }))
+    );
+
+    for (const path of results) {
+      const meta = await sharp(path).metadata();
+      assert.strictEqual(meta.width, 400, 'every reader should see a complete image');
+    }
+  });
+
+  it('leaves no temporary files behind', async () => {
+    const storagePath = await writeSource('clean.jpg', 800, 600);
+    await service.ensure({ id: 'tidy', storagePath });
+
+    const leftovers = readdirSync(thumbs).filter(f => f.endsWith('.tmp'));
+    assert.deepStrictEqual(leftovers, []);
+  });
+
+  it('removes a thumbnail on request', async () => {
+    const storagePath = await writeSource('gone.jpg', 800, 600);
+    const path = await service.ensure({ id: 'bye', storagePath });
+    assert.ok(existsSync(path));
+
+    await service.remove('bye');
+
+    assert.ok(!existsSync(path));
   });
 
   it('returns null when the source does not exist', async () => {

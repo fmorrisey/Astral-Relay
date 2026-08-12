@@ -2,6 +2,9 @@ import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import fastifyCors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join as joinPath } from 'path';
 import { TestDB } from './db.js';
 import { Post } from '../../src/models/Post.js';
 import { User } from '../../src/models/User.js';
@@ -35,7 +38,10 @@ export async function buildFastify(options = {}) {
   const storageService = new StorageService('/tmp/test-workspace');
   const thumbnailService = new ThumbnailService({
     workspacePath: '/tmp/test-workspace',
-    thumbnailDir: '/tmp/test-workspace/.thumbnails'
+    // Fresh per instance. A fixed directory persisted between runs, and because
+    // ensure() caches on existence with reused fixture ids, a leftover file made
+    // the "source is missing" test answer 200 on the next run.
+    thumbnailDir: mkdtempSync(joinPath(tmpdir(), 'relay-test-thumbs-'))
   });
   const exportService = new ExportService({
     workspacePath: '/tmp/test-workspace',

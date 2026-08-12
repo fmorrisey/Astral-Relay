@@ -78,6 +78,10 @@ export class Media {
       // path on the published site and does not resolve here.
       fileUrl: `/api/media/${media.id}/file`,
       altText: media.alt_text,
+      // Ownership checks compare against this. Omitting it made
+      // ownsOrAdmin(user, undefined) false for every non-admin, so authors were
+      // refused on their own media.
+      createdBy: media.created_by,
       createdAt: media.created_at
     };
   }

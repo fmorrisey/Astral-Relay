@@ -14,24 +14,39 @@ export function MediaUploader() {
   const [altDraft, setAltDraft] = useState('');
   const [toast, setToast] = useState(null);
   const fileInput = useRef(null);
+  // Only the newest request may write to state. Without this a slow filtered
+  // response can land after a cleared one and leave the grid showing results
+  // that no longer match an empty search box.
+  const requestId = useRef(0);
 
   useEffect(() => {
     // Debounced so typing a filename does not fire a request per keystroke.
-    const timer = setTimeout(() => loadMedia(0, search), search ? 250 : 0);
+    const timer = setTimeout(() => loadMedia(0, search), 250);
     return () => clearTimeout(timer);
   }, [search]);
 
   async function loadMedia(nextOffset = 0, term = search) {
+    const mine = ++requestId.current;
     setLoading(true);
     try {
-      const data = await api.getMedia({ limit: PAGE_SIZE, offset: nextOffset, search: term });
+      let data = await api.getMedia({ limit: PAGE_SIZE, offset: nextOffset, search: term });
+
+      // Deleting the last item on the last page leaves an offset past the end,
+      // which renders the empty state -- and the pagination controls live in the
+      // non-empty branch, so there is no way back. Step back a page instead.
+      if (data.media.length === 0 && nextOffset > 0 && data.total > 0) {
+        nextOffset = Math.max(0, Math.min(nextOffset, data.total - 1) - ((data.total - 1) % PAGE_SIZE));
+        data = await api.getMedia({ limit: PAGE_SIZE, offset: nextOffset, search: term });
+      }
+
+      if (mine !== requestId.current) return;
       setMedia(data.media);
       setTotal(data.total);
       setOffset(nextOffset);
     } catch (err) {
-      showToast(err.message, 'error');
+      if (mine === requestId.current) showToast(err.message, 'error');
     } finally {
-      setLoading(false);
+      if (mine === requestId.current) setLoading(false);
     }
   }
 

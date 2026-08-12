@@ -1,6 +1,7 @@
 import sharp from 'sharp';
-import { mkdir } from 'fs/promises';
+import { mkdir, rename, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
+import { randomBytes } from 'crypto';
 import { join, dirname } from 'path';
 import logger from '../utils/logger.js';
 
@@ -34,6 +35,11 @@ export class ThumbnailService {
     return join(this.workspacePath, 'public', storagePath);
   }
 
+  /** Discard a thumbnail, e.g. when its media is deleted. */
+  async remove(mediaId) {
+    await unlink(this.pathFor(mediaId)).catch(() => {});
+  }
+
   /**
    * Path to the thumbnail, generating it if absent.
    *
@@ -52,14 +58,26 @@ export class ThumbnailService {
 
     await mkdir(dirname(thumbPath), { recursive: true });
 
+    // Write to a unique temporary name and rename into place. Writing directly
+    // would let a concurrent request see the destination exist at zero bytes and
+    // stream a truncated image -- which the route then tells the browser to
+    // cache as immutable for a year. rename is atomic within a directory.
+    const tempPath = `${thumbPath}.${randomBytes(6).toString('hex')}.tmp`;
+
     // withoutEnlargement so a small source is not upscaled into a bigger file
     // than the original. rotate() for the same reason the main pipeline does it:
     // the source may carry EXIF orientation.
-    await sharp(source)
-      .rotate()
-      .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
-      .webp({ quality: THUMB_QUALITY })
-      .toFile(thumbPath);
+    try {
+      await sharp(source)
+        .rotate()
+        .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
+        .webp({ quality: THUMB_QUALITY })
+        .toFile(tempPath);
+      await rename(tempPath, thumbPath);
+    } catch (error) {
+      await unlink(tempPath).catch(() => {});
+      throw error;
+    }
 
     logger.info(`Generated thumbnail: ${id}`);
     return thumbPath;

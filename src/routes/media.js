@@ -115,7 +115,7 @@ export default async function mediaRoutes(fastify) {
       return reply.status(403).send({ error: 'You can only edit your own media' });
     }
 
-    const { altText } = validate(schemas.updateMedia, request.body);
+    const { altText } = validate(schemas.updateMedia, request.body || {});
     const updated = mediaModel.updateAltText(request.params.id, altText);
 
     fastify.logActivity({
@@ -152,6 +152,9 @@ export default async function mediaRoutes(fastify) {
     }
 
     await storageService.deleteMedia(media.storagePath);
+    // Otherwise generated thumbnails accumulate forever, keyed by ids that no
+    // longer exist.
+    await thumbnailService.remove(request.params.id);
     mediaModel.delete(request.params.id);
 
     fastify.logActivity({
