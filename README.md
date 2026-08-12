@@ -267,6 +267,63 @@ astral-relay/
 └── docker-compose.yml
 ```
 
+## Continuous deployment
+
+Pushing to `main` deploys to the server. The workflow runs on a **GitHub-hosted**
+runner, joins the tailnet as an ephemeral node, and connects over SSH.
+
+A self-hosted runner would be simpler and is the wrong choice here: this
+repository is public, so a self-hosted runner would execute workflow code
+proposed by pull requests on the machine holding the tailnet, the site source and
+the database. Nothing untrusted runs on the target with this arrangement.
+
+### What the deploy key can do
+
+The key is pinned to a forced command in `~/.ssh/authorized_keys`:
+
+```
+command="$HOME/.local/bin/astral-relay-deploy",...,restrict ssh-ed25519 AAAA...
+```
+
+It runs a deploy and cannot open a shell — whatever command the client sends is
+ignored. The script lives **outside** the repository on purpose: if the forced
+command pointed at a tracked file, anyone who could merge to `main` could change
+what runs on the host.
+
+Update the installed copy after editing `scripts/deploy.sh`:
+
+```bash
+install -Dm755 scripts/deploy.sh ~/.local/bin/astral-relay-deploy
+```
+
+### Setup
+
+Repository **variables**:
+
+| Name | Value |
+|---|---|
+| `DEPLOY_HOST` | the host's tailnet IP |
+| `DEPLOY_USER` | the account owning the deployment |
+
+Repository **secrets**:
+
+| Name | What |
+|---|---|
+| `DEPLOY_SSH_KEY` | private half of the deploy key |
+| `DEPLOY_HOST_KEY` | the host's public key, for pinning |
+| `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client, scope `auth_keys` |
+| `TS_OAUTH_SECRET` | its secret |
+
+The Tailscale OAuth client needs an ACL tag (`tag:ci`) that is allowed to reach
+the host on port 22.
+
+### Note on the deploy path
+
+The deployment directory doubles as a development checkout, and the script
+`git reset --hard`s it. Uncommitted changes are saved as a patch under
+`data/backups/` first rather than being destroyed, but the cleaner arrangement is
+a separate clone for deployment.
+
 ## API Documentation
 
 An OpenAPI 3 document is served at `/api/openapi.json`, with a browsable UI at
