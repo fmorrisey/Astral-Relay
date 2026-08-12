@@ -2,6 +2,9 @@ import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import fastifyCors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join as joinPath } from 'path';
 import { TestDB } from './db.js';
 import { Post } from '../../src/models/Post.js';
 import { User } from '../../src/models/User.js';
@@ -9,6 +12,7 @@ import { Media } from '../../src/models/Media.js';
 import { Tag } from '../../src/models/Tag.js';
 import { AuthService } from '../../src/services/auth.js';
 import { StorageService } from '../../src/services/storage.js';
+import { ThumbnailService } from '../../src/services/thumbnails.js';
 import { ExportService } from '../../src/services/exporter.js';
 
 import healthRoutes from '../../src/routes/health.js';
@@ -32,6 +36,13 @@ export async function buildFastify(options = {}) {
   const tagModel = new Tag(db);
   const authService = new AuthService(db);
   const storageService = new StorageService('/tmp/test-workspace');
+  const thumbnailService = new ThumbnailService({
+    workspacePath: '/tmp/test-workspace',
+    // Fresh per instance. A fixed directory persisted between runs, and because
+    // ensure() caches on existence with reused fixture ids, a leftover file made
+    // the "source is missing" test answer 200 on the next run.
+    thumbnailDir: mkdtempSync(joinPath(tmpdir(), 'relay-test-thumbs-'))
+  });
   const exportService = new ExportService({
     workspacePath: '/tmp/test-workspace',
     collections: ['blog']
@@ -68,6 +79,7 @@ export async function buildFastify(options = {}) {
   fastify.decorate('tagModel', tagModel);
   fastify.decorate('authService', authService);
   fastify.decorate('storageService', storageService);
+  fastify.decorate('thumbnailService', thumbnailService);
   fastify.decorate('exportService', exportService);
   fastify.decorate('logActivity', logActivity);
 

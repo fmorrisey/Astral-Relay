@@ -50,6 +50,7 @@ export const api = {
 
   // Media
   getMedia: (params = {}) => api.request(`/media?${new URLSearchParams(params)}`),
+  updateMedia: (id, data) => api.request(`/media/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteMedia: (id) => api.request(`/media/${id}`, { method: 'DELETE' }),
   async uploadMedia(file, alt = '') {
     const formData = new FormData();

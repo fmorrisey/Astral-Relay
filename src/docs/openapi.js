@@ -323,7 +323,46 @@ export function buildOpenApiDocument({ version }) {
           responses: { 201: json('Uploaded'), 400: ERRORS[400], 401: ERRORS[401], 429: ERRORS[429] }
         }
       },
+      '/api/media/{id}/file': {
+        get: {
+          tags: ['media'],
+          summary: 'The original image, served by the CMS',
+          description:
+            'media.url is the path on the published site and does not resolve here — the static ' +
+            'plugin serves this app\'s public directory, not the Astro workspace. Use this to ' +
+            'display an image inside the CMS.',
+          parameters: [idParam],
+          responses: {
+            200: { description: 'The image', content: { 'image/*': {} } },
+            401: ERRORS[401], 404: json('No such image, or its source file is missing')
+          }
+        }
+      },
+      '/api/media/{id}/thumbnail': {
+        get: {
+          tags: ['media'],
+          summary: 'A 400px WebP thumbnail',
+          description:
+            'Generated on first request, so images predating thumbnails need no backfill. ' +
+            'Served by the CMS rather than from the site: a grid thumbnail is an artifact of ' +
+            'this application, not published content. Immutable, so it caches hard.',
+          parameters: [idParam],
+          responses: {
+            200: { description: 'WebP image', content: { 'image/webp': {} } },
+            401: ERRORS[401],
+            404: json('No such image, or its source file is missing')
+          }
+        }
+      },
       '/api/media/{id}': {
+        patch: {
+          tags: ['media'],
+          summary: 'Edit alt text',
+          description: 'Authors may only edit their own media.',
+          parameters: [idParam],
+          requestBody: body('updateMedia'),
+          responses: { 200: json('Updated'), 400: ERRORS[400], 401: ERRORS[401], 403: ERRORS[403], 404: ERRORS[404] }
+        },
         get: { tags: ['media'], summary: 'Get one media item', parameters: [idParam], responses: { 200: json('Media'), 401: ERRORS[401], 404: ERRORS[404] } },
         delete: {
           tags: ['media'],

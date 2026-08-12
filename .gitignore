@@ -8,3 +8,6 @@ npm-debug.log
 .DS_Store
 .claude/*
 .vscode/*
+
+# Generated thumbnails live beside the database, not in the workspace
+data/thumbnails/

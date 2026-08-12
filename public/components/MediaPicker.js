@@ -65,7 +65,7 @@ export function MediaPicker({ onSelect, onCancel, title = 'Choose an image' }) {
           ${media.map(m => html`
             <div class="media-item" key=${m.id} style="cursor: pointer"
                  onClick=${() => onSelect(m)}>
-              <img src=${m.url} alt=${m.altText || m.originalFilename} loading="lazy" />
+              <img src=${m.thumbnailUrl} alt=${m.altText || m.originalFilename} loading="lazy" />
               <div class="media-info">
                 <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
                   ${m.originalFilename}
