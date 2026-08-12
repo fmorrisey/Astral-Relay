@@ -3,8 +3,11 @@ name: CI
 on:
   push:
     branches: [ main, pipelines ]
+  # No base-branch filter. Filtering by base meant a PR targeting anything other
+  # than main never ran CI at all -- a stack of five PRs reached merge-ready
+  # having only been tested locally, and the gap was invisible because the
+  # checks list simply showed nothing rather than showing a failure.
   pull_request:
-    branches: [ main, pipelines ]
 
 jobs:
   test:
