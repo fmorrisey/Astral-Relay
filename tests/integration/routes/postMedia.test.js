@@ -34,7 +34,8 @@ describe('Post media', () => {
   it('starts with nothing attached', async () => {
     const res = await req('GET', `/api/posts/${post.id}/media`);
     assert.strictEqual(res.statusCode, 200);
-    assert.deepStrictEqual(JSON.parse(res.body).media, { hero: null, cover: null, gallery: [] });
+    assert.deepStrictEqual(JSON.parse(res.body).media,
+      { hero: null, cover: null, gallery: [], managed: false });
   });
 
   it('sets the hero and cover slots', async () => {
@@ -99,6 +100,50 @@ describe('Post media', () => {
     });
   });
 
+  // post_media is keyed (post_id, media_id), so a repeated id was a primary-key
+  // violation surfacing as a 500.
+  it('deduplicates a repeated image rather than failing', async () => {
+    makeMedia('m1', 'media/2026/08/m1.jpg');
+    makeMedia('m2', 'media/2026/08/m2.jpg');
+
+    const res = await req('PUT', `/api/posts/${post.id}/media`, {
+      gallery: [{ mediaId: 'm1' }, { mediaId: 'm2' }, { mediaId: 'm1' }]
+    });
+
+    assert.strictEqual(res.statusCode, 200);
+    assert.deepStrictEqual(JSON.parse(res.body).media.gallery.map(g => g.id), ['m1', 'm2']);
+  });
+
+  describe('alt text semantics', () => {
+    // Three states, not two: inherit, explicit text, and explicitly none.
+    it('distinguishes an explicit empty alt from an inherited one', async () => {
+      makeMedia('m1', 'media/2026/08/m1.jpg', 'the image default');
+      makeMedia('m2', 'media/2026/08/m2.jpg', 'the image default');
+
+      const res = await req('PUT', `/api/posts/${post.id}/media`, {
+        gallery: [{ mediaId: 'm1', alt: '' }, { mediaId: 'm2' }]
+      });
+
+      const { gallery } = JSON.parse(res.body).media;
+      assert.strictEqual(gallery[0].alt, '', 'explicit empty stays empty');
+      assert.strictEqual(gallery[0].altIsInherited, false);
+      assert.strictEqual(gallery[1].alt, 'the image default');
+      assert.strictEqual(gallery[1].altIsInherited, true);
+    });
+
+    // The editor reads a resolved alt and writes it back; if inheritance were
+    // materialised, later edits to the image's own alt would stop propagating.
+    it('keeps inheriting after a save that did not set an override', async () => {
+      makeMedia('m1', 'media/2026/08/m1.jpg', 'first caption');
+      await req('PUT', `/api/posts/${post.id}/media`, { gallery: [{ mediaId: 'm1' }] });
+
+      app.db.prepare("UPDATE media SET alt_text = 'edited later' WHERE id = 'm1'").run();
+
+      const res = await req('GET', `/api/posts/${post.id}/media`);
+      assert.strictEqual(JSON.parse(res.body).media.gallery[0].alt, 'edited later');
+    });
+  });
+
   describe('rejections', () => {
     it('refuses an image id that does not exist, changing nothing', async () => {
       makeMedia('m1', 'media/2026/08/m1.jpg');
@@ -112,6 +157,11 @@ describe('Post media', () => {
       // A gallery half-applied because one id was stale is worse than a refusal.
       const after = await req('GET', `/api/posts/${post.id}/media`);
       assert.deepStrictEqual(JSON.parse(after.body).media.gallery.map(g => g.id), ['m1']);
+    });
+
+    it('answers 400, not 500, when the body is missing', async () => {
+      const res = await req('PUT', `/api/posts/${post.id}/media`);
+      assert.strictEqual(res.statusCode, 400);
     });
 
     it('requires authentication', async () => {

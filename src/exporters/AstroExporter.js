@@ -36,7 +36,7 @@ export class AstroExporter {
       return {
         success: true,
         filePath: filePath.replace(this.workspaceRoot, ''),
-        images: Object.keys(this._imageFields(media)).length
+        images: Object.keys(this._imageFields(media).write).length
       };
     } catch (error) {
       logger.error({ error: error.message }, 'Export failed');
@@ -97,19 +97,30 @@ export class AstroExporter {
    * the safer direction to be wrong in.
    */
   _imageFields(media) {
-    if (!media) return {};
+    if (!media) return { write: {}, remove: [] };
 
-    const fields = {};
-    if (media.hero) fields.heroImage = media.hero.url;
-    if (media.cover) fields.coverImage = media.cover.url;
+    const write = {};
+    if (media.hero) write.heroImage = media.hero.url;
+    if (media.cover) write.coverImage = media.cover.url;
     if (media.gallery?.length) {
-      fields.gallery = media.gallery.map(item => ({ src: item.url, alt: item.alt || '' }));
+      write.gallery = media.gallery.map(item => ({ src: item.url, alt: item.alt || '' }));
     }
 
-    return fields;
+    // Until the CMS has been asked to manage this post's images, absent means
+    // "unknown", and a hand-written value is left alone. Once it manages them,
+    // absent means "there is none" -- so a cleared slot, or one emptied by
+    // deleting the image behind it, is removed from the file rather than left
+    // pointing at something that no longer exists.
+    const remove = media.managed
+      ? ['heroImage', 'coverImage', 'gallery'].filter(key => !(key in write))
+      : [];
+
+    return { write, remove };
   }
 
   _generateFrontmatter(post, tags, existing = {}, media = null) {
+    const images = this._imageFields(media);
+
     // The keys this CMS owns and will always rewrite. Everything else in
     // `existing` is passed through untouched.
     const owned = {
@@ -123,14 +134,15 @@ export class AstroExporter {
       tags: tags.map(t => typeof t === 'string' ? t : t.name),
       published: post.status === 'published',
       // Only present when set; see _imageFields.
-      ...this._imageFields(media)
+      ...images.write
     };
 
     // Spread order matters: keys already in the file keep their original
     // position, and only owned keys are replaced. New owned keys are appended.
     const data = { ...existing, ...owned };
+    for (const key of images.remove) delete data[key];
 
-    const preserved = Object.keys(existing).filter(k => !(k in owned));
+    const preserved = Object.keys(existing).filter(k => !(k in owned) && !images.remove.includes(k));
     if (preserved.length > 0) {
       logger.info(`Preserved frontmatter keys: ${preserved.join(', ')}`);
     }

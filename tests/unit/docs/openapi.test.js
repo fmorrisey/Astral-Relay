@@ -71,6 +71,16 @@ describe('OpenAPI document', () => {
     assert.deepStrictEqual(createUser.properties.role.enum, ['admin', 'author']);
   });
 
+  // Dropped silently before, so the spec advertised a non-nullable string for a
+  // field whose null is the documented way to clear a slot.
+  it('carries nullability through to the schema', () => {
+    const schema = doc.paths['/api/posts/{id}/media'].put
+      .requestBody.content['application/json'].schema;
+
+    assert.strictEqual(schema.properties.heroMediaId.nullable, true);
+    assert.strictEqual(schema.properties.coverMediaId.nullable, true);
+  });
+
   it('marks the routes reachable without a session as public', () => {
     for (const path of ['/api/health', '/api/setup/status', '/api/auth/login', '/api/auth/recover', '/api/auth/setup']) {
       const [method] = Object.keys(doc.paths[path]);

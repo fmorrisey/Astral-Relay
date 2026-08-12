@@ -74,6 +74,7 @@ export class Post {
       SELECT
         p.id, p.collection, p.slug, p.title, p.summary, p.status,
         p.created_at, p.updated_at, p.published_at,
+        p.hero_media_id, p.cover_media_id,
         u.display_name as author_name
       FROM posts p
       LEFT JOIN users u ON p.created_by = u.id
@@ -183,6 +184,9 @@ export class Post {
     if (coverMediaId !== undefined) { setSlots.push('cover_media_id = ?'); params.push(coverMediaId || null); }
 
     this.db.transaction(() => {
+      // From here on this post's image fields are the CMS's to write.
+      this.db.prepare('UPDATE posts SET images_managed = 1 WHERE id = ?').run(id);
+
       if (setSlots.length > 0) {
         this.db.prepare(`UPDATE posts SET ${setSlots.join(', ')} WHERE id = ?`).run(...params, id);
       }
@@ -193,9 +197,19 @@ export class Post {
           INSERT INTO post_media (post_id, media_id, sort_order, alt_text)
           VALUES (?, ?, ?, ?)
         `);
-        gallery.forEach((item, index) => {
-          insert.run(id, item.mediaId, index, item.alt || null);
-        });
+        // Deduplicate, keeping the first position. post_media is keyed on
+        // (post_id, media_id), so a repeat is a primary-key violation -- and the
+        // same image twice in one gallery is a mis-click, not an intent.
+        const seen = new Set();
+        let position = 0;
+        for (const item of gallery) {
+          if (seen.has(item.mediaId)) continue;
+          seen.add(item.mediaId);
+          // Empty string is a deliberate "no alt text", distinct from null,
+          // which means "fall back to the image's own". Only undefined defers.
+          const alt = item.alt === undefined ? null : item.alt;
+          insert.run(id, item.mediaId, position++, alt);
+        }
       }
     })();
 
@@ -210,7 +224,7 @@ export class Post {
    */
   getMedia(id) {
     const post = this.db
-      .prepare('SELECT hero_media_id, cover_media_id FROM posts WHERE id = ?')
+      .prepare('SELECT hero_media_id, cover_media_id, images_managed FROM posts WHERE id = ?')
       .get(id);
     if (!post) return null;
 
@@ -225,7 +239,12 @@ export class Post {
       url: `/${row.storage_path}`,
       width: row.width,
       height: row.height,
-      alt: row.use_alt || row.alt_text || ''
+      // null means "use the image's own"; empty string is an explicit choice to
+      // have none, so it must not fall through.
+      alt: row.use_alt === null || row.use_alt === undefined ? (row.alt_text || '') : row.use_alt,
+      // Which of the two the caller is looking at, so the editor can write back
+      // an override without silently freezing the inherited value.
+      altIsInherited: row.use_alt === null || row.use_alt === undefined
     }));
 
     const slot = mediaId => {
@@ -237,7 +256,8 @@ export class Post {
     return {
       hero: slot(post.hero_media_id),
       cover: slot(post.cover_media_id),
-      gallery
+      gallery,
+      managed: post.images_managed === 1
     };
   }
 

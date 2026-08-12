@@ -42,7 +42,11 @@ export const schemas = {
       mediaId: Joi.string().required(),
       alt: Joi.string().max(300).allow('').optional()
     })).max(100).optional()
-  }),
+  // At least one key. Every field is optional individually, so an empty body
+  // would otherwise be accepted -- and since any successful call marks the post
+  // as CMS-managed, a bodyless request would quietly take ownership of the image
+  // fields and strip hand-written ones on the next publish.
+  }).min(1),
 
   createTag: Joi.object({
     name: Joi.string().min(1).max(50).required()

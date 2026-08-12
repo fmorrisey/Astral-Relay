@@ -228,7 +228,7 @@ export function PostEditor({ postId }) {
       </div>
 
       ${/* Associations need a post id, so this appears once the draft is saved. */ ''}
-      ${!isNew && html`<${PostImages} postId=${postId} />`}
+      ${!isNew && html`<${PostImages} postId=${postId} onToast=${showToast} />`}
 
       <div class="action-bar">
         ${!isNew && html`

@@ -137,6 +137,7 @@ describe('AstroExporter', () => {
 
   describe('image fields', () => {
     const media = {
+      managed: true,
       hero: { id: 'h', url: '/media/2026/08/hero.jpg', alt: '' },
       cover: null,
       gallery: [
@@ -176,6 +177,32 @@ describe('AstroExporter', () => {
       const fm = frontmatterOf();
       assert.strictEqual(fm.heroImage, '/media/hand-written.jpg');
       assert.deepStrictEqual(fm.gallery, [{ src: '/media/hand.jpg', alt: 'By hand' }]);
+    });
+
+    // Once the CMS manages a post's images, absent means "there is none" --
+    // otherwise clearing a hero, or deleting the image behind it, left a path in
+    // frontmatter pointing at something that no longer exists, which fails an
+    // Astro image() schema and could only be fixed by editing the file.
+    it('removes a field the CMS manages but no longer has', async () => {
+      writeExisting({
+        title: 'Old', date: '2020-09-11', published: true,
+        heroImage: '/media/2026/08/hero.jpg'
+      });
+
+      await exporter.exportPost(post(), [], { hero: null, cover: null, gallery: [], managed: true });
+
+      assert.ok(!('heroImage' in frontmatterOf()));
+    });
+
+    it('still leaves it alone when the CMS does not manage the post', async () => {
+      writeExisting({
+        title: 'Old', date: '2020-09-11', published: true,
+        heroImage: '/media/hand-written.jpg'
+      });
+
+      await exporter.exportPost(post(), [], { hero: null, cover: null, gallery: [], managed: false });
+
+      assert.strictEqual(frontmatterOf().heroImage, '/media/hand-written.jpg');
     });
 
     it('overwrites a hand-written value once the CMS does have one', async () => {

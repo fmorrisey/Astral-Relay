@@ -32,6 +32,12 @@ export function PostImages({ postId, onToast }) {
   }
 
   async function save(next) {
+    // Every save replaces the whole set and is built from the state at call
+    // time, so a second one started before the first returns is built from stale
+    // data and silently discards the first. Controls are disabled while saving;
+    // this guards the paths that disabling cannot cover, such as a blur firing
+    // as a row is removed.
+    if (saving) return;
     setSaving(true);
     try {
       const data = await api.setPostMedia(postId, {
@@ -89,11 +95,12 @@ export function PostImages({ postId, onToast }) {
       ${media[name] ? html`
         <div>
           <img src=${media[name].url} alt="" style="width: 100%; border-radius: var(--radius); display: block" />
-          <button class="btn btn-outline btn-sm" style="width: 100%; margin-top: 4px"
+          <button class="btn btn-outline btn-sm" style="width: 100%; margin-top: 4px" disabled=${saving}
             onClick=${() => save({ ...media, [name]: null })}>Remove</button>
         </div>
       ` : html`
-        <button class="btn btn-outline" style="width: 100%" onClick=${() => setPicking(name)}>
+        <button class="btn btn-outline" style="width: 100%" disabled=${saving}
+          onClick=${() => setPicking(name)}>
           Choose
         </button>
       `}
@@ -111,7 +118,8 @@ export function PostImages({ postId, onToast }) {
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
         <label style="font-size: 13px">Gallery (${media.gallery.length})</label>
-        <button class="btn btn-outline btn-sm" onClick=${() => setPicking('gallery')}>Add image</button>
+        <button class="btn btn-outline btn-sm" disabled=${saving}
+          onClick=${() => setPicking('gallery')}>Add image</button>
       </div>
 
       ${media.gallery.length === 0 ? html`
@@ -121,15 +129,15 @@ export function PostImages({ postId, onToast }) {
       ` : media.gallery.map((item, index) => html`
         <div key=${item.id} style="display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border)">
           <img src=${item.url} alt="" style="width: 56px; height: 56px; object-fit: cover; border-radius: 4px" />
-          <input type="text" placeholder="Alt text" value=${item.alt}
-            style="flex: 1"
+          <input type="text" placeholder=${item.altIsInherited ? 'Alt text (from the image)' : 'Alt text'}
+            value=${item.alt} style="flex: 1" disabled=${saving}
             onInput=${e => setAlt(index, e.target.value)}
             onBlur=${() => save(media)} />
-          <button class="btn btn-outline btn-sm" disabled=${index === 0}
+          <button class="btn btn-outline btn-sm" disabled=${saving || index === 0}
             onClick=${() => moveItem(index, -1)} title="Move up">↑</button>
-          <button class="btn btn-outline btn-sm" disabled=${index === media.gallery.length - 1}
+          <button class="btn btn-outline btn-sm" disabled=${saving || index === media.gallery.length - 1}
             onClick=${() => moveItem(index, 1)} title="Move down">↓</button>
-          <button class="btn btn-danger btn-sm"
+          <button class="btn btn-danger btn-sm" disabled=${saving}
             onClick=${() => save({ ...media, gallery: media.gallery.filter((_, i) => i !== index) })}>×</button>
         </div>
       `)}

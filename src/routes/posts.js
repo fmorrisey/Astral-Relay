@@ -193,7 +193,7 @@ export default async function postRoutes(fastify) {
     }
     if (denyIfNotOwner(request, reply, post)) return reply;
 
-    const data = validate(schemas.setPostMedia, request.body);
+    const data = validate(schemas.setPostMedia, request.body || {});
 
     // Every referenced image must exist, checked before writing anything: a
     // gallery half-applied because one id was stale is worse than a rejection.
