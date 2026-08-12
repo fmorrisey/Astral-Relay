@@ -12,6 +12,26 @@ const solid = (width, height, opts = {}) =>
     .toBuffer();
 
 const meta = buffer => sharp(buffer).metadata();
+const animatedMeta = buffer => sharp(buffer, { animated: true }).metadata();
+
+/**
+ * A real two-frame GIF89a, assembled byte by byte.
+ *
+ * sharp's create/raw inputs cannot emit an animated GIF, which an earlier
+ * version of this file wrongly concluded meant no fixture was possible. The
+ * frames must differ in pixel content -- the encoder collapses identical frames
+ * into one page, which reads as the very flattening being tested for.
+ */
+const animatedGif = () => Buffer.from(
+  '474946383961' + '0200' + '0200' + 'F10000' +
+  'FF0000' + '00FF00' + '0000FF' + 'FFFFFF' +
+  '21F904' + '04' + '3200' + '0000' +
+  '2C' + '0000' + '0000' + '0200' + '0200' + '00' +
+  '02' + '02' + '4C01' + '00' +
+  '21F904' + '04' + '3200' + '0000' +
+  '2C' + '0000' + '0000' + '0200' + '0200' + '00' +
+  '02' + '02' + '8C51' + '00' +
+  '3B', 'hex');
 
 describe('processUpload', () => {
   describe('recorded dimensions', () => {
@@ -91,21 +111,43 @@ describe('processUpload', () => {
       assert.strictEqual((await meta(result.buffer)).format, 'webp');
     });
 
-    // GIFs are opened with { animated: true }, without which sharp reads only
-    // the first page and re-encodes a multi-frame image as a still.
-    //
-    // Multi-frame preservation is NOT asserted here: sharp's raw input could not
-    // be coaxed into producing an animated GIF in this environment, so there is
-    // no fixture to test against. The fix rests on sharp's documented behaviour,
-    // and this covers the single-frame path plus the frame count being reported.
-    it('keeps GIF as GIF and reports a frame count', async () => {
+    it('keeps a still GIF as GIF', async () => {
       const gif = await sharp({ create: { width: 100, height: 100, channels: 4, background: '#fff' } })
         .gif().toBuffer();
       const result = await processUpload(gif, 'image/gif');
 
       assert.match(result.filename, /\.gif$/);
       assert.strictEqual((await meta(result.buffer)).format, 'gif');
-      assert.strictEqual(result.frames, 1);
+    });
+
+    // Without { animated: true } sharp reads only the first page and re-encodes
+    // a multi-frame image as a still.
+    it('keeps every frame of an animated GIF', async () => {
+      const source = animatedGif();
+      assert.strictEqual((await animatedMeta(source)).pages, 2, 'fixture should have 2 frames');
+
+      const result = await processUpload(source, 'image/gif');
+
+      assert.strictEqual((await animatedMeta(result.buffer)).pages, 2);
+    });
+
+    // Reported height must be one frame. sharp gives the stacked height for an
+    // animated image, which would record a 2px frame as 4px tall.
+    it('reports the height of a single frame, not every frame stacked', async () => {
+      const result = await processUpload(animatedGif(), 'image/gif');
+
+      assert.strictEqual(result.height, 2);
+    });
+
+    // WebP is what most GIF converters emit, and it was excluded from the
+    // animated path -- flattening animated WebP exactly as GIF used to be.
+    it('keeps every frame of an animated WebP', async () => {
+      const source = await sharp(animatedGif(), { animated: true }).webp().toBuffer();
+      assert.strictEqual((await animatedMeta(source)).pages, 2, 'fixture should have 2 frames');
+
+      const result = await processUpload(source, 'image/webp');
+
+      assert.strictEqual((await animatedMeta(result.buffer)).pages, 2);
     });
 
     it('gives every upload a unique filename', async () => {
@@ -122,6 +164,19 @@ describe('processUpload', () => {
       await assert.rejects(
         () => processUpload(Buffer.from('not an image'), 'application/pdf'),
         /Invalid file type/
+      );
+    });
+
+    // Opening as animated shares one pixel budget across every frame, so a long
+    // animation can exceed it. That throw carries no statusCode and surfaced as
+    // a 500, telling the user nothing about a file they could simply shrink.
+    it('reports a too-large animation as a 400, not an unhandled error', async () => {
+      const huge = await sharp({ create: { width: 12000, height: 12000, channels: 3, background: '#fff' } })
+        .webp().toBuffer();
+
+      await assert.rejects(
+        () => processUpload(huge, 'image/webp'),
+        err => err.statusCode === 400 && /too many pixels/i.test(err.message)
       );
     });
 
