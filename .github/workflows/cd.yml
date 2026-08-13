@@ -15,94 +15,41 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to Rainier
-    runs-on: ubuntu-latest
+    # The runner lives on the target, so there is nothing to connect to: no
+    # tailnet to join, no SSH hop, and no deploy credentials to hold. This is how
+    # Spokerv2 already deploys to this same host.
+    #
+    # This repository is public, which is usually the argument against a
+    # self-hosted runner: for `pull_request` events GitHub builds the workflow
+    # from the PR head, so a fork could aim a job at this machine. Nothing here
+    # is PR-triggered -- CD runs only on a push to main or a manual dispatch,
+    # both of which need write access -- and CI runs on GitHub-hosted runners.
+    # Keep it that way: a `pull_request` trigger on this workflow, or any
+    # self-hosted job in ci.yml, would undo that reasoning.
+    runs-on: self-hosted
+
     steps:
-      # Checked before the tailnet step so a missing credential says what to do,
-      # rather than surfacing as an authentication failure from inside an action.
-      - name: Check deploy credentials are configured
-        env:
-          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
-        run: |
-          missing=()
-          for name in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET DEPLOY_SSH_KEY DEPLOY_HOST_KEY; do
-            [ -z "${!name:-}" ] && missing+=("$name")
-          done
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing repository secrets: ${missing[*]}"
-            echo "See 'Continuous deployment' in the README. The Tailscale pair comes from an"
-            echo "OAuth client with the auth_keys scope, owning the tag:ci ACL tag."
-            exit 1
-          fi
-
-      # A GitHub-hosted runner rather than a self-hosted one. This repository is
-      # public, and a self-hosted runner would put workflow code proposed by pull
-      # requests on the machine that holds the tailnet, the site source and the
-      # database. Nothing untrusted runs on the target here -- the runner only
-      # opens an SSH connection to it.
+      # The installed copy, deliberately, rather than scripts/deploy.sh from the
+      # tree. The script git-resets the very checkout it would be running from,
+      # and bash reads a script incrementally as it executes -- so running the
+      # in-tree copy risks the file changing underneath the interpreter partway
+      # through a deploy. Keeping the executed copy outside the repository also
+      # means "can merge to main" does not silently mean "can run anything on
+      # this host".
       #
-      # The host has no public route: rainierserver.com resolves to Cloudflare,
-      # and its SSH is reachable only over the tailnet. So the runner joins the
-      # tailnet as an ephemeral node for the length of the job.
-      - name: Join the tailnet
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-
-      # The step above cannot be relied on to fail. It retries `tailscale up` in a
-      # loop whose last command is a `sleep`, so when every attempt fails -- a 403
-      # from an OAuth client missing the auth_keys scope, say -- the loop still
-      # exits 0 and the step is reported green. The deploy then dies further along
-      # at an SSH connection timeout, which says nothing about the real cause.
-      - name: Verify the tailnet connection came up
+      # Re-run this after changing scripts/deploy.sh:
+      #   install -Dm755 scripts/deploy.sh ~/.local/bin/astral-relay-deploy
+      - name: Deploy
         run: |
           set -euo pipefail
 
-          # Tolerate the binary being absent or the daemon not answering: an
-          # empty state falls through to the same readable failure below.
-          state="$(tailscale status --json 2>/dev/null | jq -r '.BackendState' || true)"
-          if [ "$state" != "Running" ]; then
-            echo "::error::Not connected to the tailnet (BackendState=$state)."
-            echo "Read the retry output of 'Join the tailnet' above. A 403 there"
-            echo "means the Tailscale OAuth client either lacks the writable"
-            echo "auth_keys scope or does not own tag:ci."
+          DEPLOY_BIN="$HOME/.local/bin/astral-relay-deploy"
+
+          if [ ! -x "$DEPLOY_BIN" ]; then
+            echo "::error::$DEPLOY_BIN is missing or not executable. Install it with:"
+            echo "  install -Dm755 scripts/deploy.sh ~/.local/bin/astral-relay-deploy"
+            echo "See 'Continuous deployment' in the README."
             exit 1
           fi
 
-      - name: Deploy over SSH
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
-        run: |
-          set -euo pipefail
-
-          for required in DEPLOY_HOST DEPLOY_USER; do
-            if [ -z "${!required:-}" ]; then
-              echo "::error::$required is not set. See 'Continuous deployment' in the README."
-              exit 1
-            fi
-          done
-
-          mkdir -p ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          # Pin the host key. The alternative, StrictHostKeyChecking=no, would
-          # hand the deploy key to whatever answers on that address.
-          printf '%s\n' "$DEPLOY_HOST_KEY" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-
-          # The command sent is ignored: the key is pinned to a forced command in
-          # authorized_keys, so this connection can only run a deploy and not a
-          # shell. Sending one anyway keeps the intent readable in the logs.
-          ssh -i ~/.ssh/deploy_key \
-              -o IdentitiesOnly=yes \
-              -o StrictHostKeyChecking=yes \
-              -o ConnectTimeout=30 \
-              "$DEPLOY_USER@$DEPLOY_HOST" astral-relay-deploy
+          "$DEPLOY_BIN"

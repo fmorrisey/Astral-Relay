@@ -269,26 +269,36 @@ astral-relay/
 
 ## Continuous deployment
 
-Pushing to `main` deploys to the server. The workflow runs on a **GitHub-hosted**
-runner, joins the tailnet as an ephemeral node, and connects over SSH.
+Pushing to `main` deploys to the server. The workflow runs on a **self-hosted**
+runner installed on the target, so there is no remote connection to make and no
+deploy credentials to store — the same arrangement Spokerv2 uses on this host.
 
-A self-hosted runner would be simpler and is the wrong choice here: this
-repository is public, so a self-hosted runner would execute workflow code
-proposed by pull requests on the machine holding the tailnet, the site source and
-the database. Nothing untrusted runs on the target with this arrangement.
+### Why a self-hosted runner is acceptable here
 
-### What the deploy key can do
+This repository is public, which is normally the argument against one: for
+`pull_request` events GitHub builds the workflow from the PR head, so a fork
+could aim a job at the machine holding the site source and the database.
 
-The key is pinned to a forced command in `~/.ssh/authorized_keys`:
+What makes it safe is that **nothing in CD is PR-triggered**. It runs only on a
+push to `main` or a manual dispatch, both of which require write access, and CI
+runs on GitHub-hosted runners. Two things preserve that, and both are easy to
+undo by accident:
 
-```
-command="$HOME/.local/bin/astral-relay-deploy",...,restrict ssh-ed25519 AAAA...
-```
+- do not add a `pull_request` trigger to `cd.yml`
+- do not give any job in `ci.yml` a self-hosted runner
 
-It runs a deploy and cannot open a shell — whatever command the client sends is
-ignored. The script lives **outside** the repository on purpose: if the forced
-command pointed at a tracked file, anyone who could merge to `main` could change
-what runs on the host.
+Set **Settings → Actions → Fork pull request workflows** to *Require approval for
+all external contributors* as a backstop; the default only covers first-time
+contributors.
+
+### What actually runs
+
+The workflow executes `~/.local/bin/astral-relay-deploy`, **not** the copy in the
+repository. That is deliberate twice over: the script `git reset --hard`s the
+very checkout it would otherwise be running from — and bash reads a script
+incrementally as it executes, so the file could change underneath the interpreter
+mid-deploy — and keeping it outside the repository means "can merge to `main`"
+does not silently mean "can run anything on this host".
 
 Update the installed copy after editing `scripts/deploy.sh`:
 
@@ -298,24 +308,25 @@ install -Dm755 scripts/deploy.sh ~/.local/bin/astral-relay-deploy
 
 ### Setup
 
-Repository **variables**:
+No repository secrets or variables are required.
 
-| Name | Value |
-|---|---|
-| `DEPLOY_HOST` | the host's tailnet IP |
-| `DEPLOY_USER` | the account owning the deployment |
+Register the runner against this repository (a registration token comes from
+`Settings → Actions → Runners`, or `gh api -X POST
+repos/<owner>/<repo>/actions/runners/registration-token`):
 
-Repository **secrets**:
+```bash
+mkdir -p ~/code/actions-runner-astral-relay && cd $_
+tar xzf ~/path/to/actions-runner-linux-x64-<version>.tar.gz
+./config.sh --url https://github.com/fmorrisey/Astral-Relay \
+            --token <registration-token> \
+            --name rainier-astral-relay \
+            --labels self-hosted,linux,x64,rainier \
+            --unattended
+sudo ./svc.sh install "$USER" && sudo ./svc.sh start
+```
 
-| Name | What |
-|---|---|
-| `DEPLOY_SSH_KEY` | private half of the deploy key |
-| `DEPLOY_HOST_KEY` | the host's public key, for pinning |
-| `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client, scope `auth_keys` |
-| `TS_OAUTH_SECRET` | its secret |
-
-The Tailscale OAuth client needs an ACL tag (`tag:ci`) that is allowed to reach
-the host on port 22.
+The account running the runner needs Docker access and write access to the
+deployment path.
 
 ### Note on the deploy path
 
