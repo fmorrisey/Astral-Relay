@@ -273,6 +273,10 @@ Pushing to `main` deploys to the server. The workflow runs on a **self-hosted**
 runner installed on the target, so there is no remote connection to make and no
 deploy credentials to store — the same arrangement Spokerv2 uses on this host.
 
+A deploy takes roughly 15–25 seconds end to end when the Docker layer cache is
+warm. A change to dependencies or the `Dockerfile` forces a real image rebuild
+and takes correspondingly longer.
+
 ### Why a self-hosted runner is acceptable here
 
 This repository is public, which is normally the argument against one: for
