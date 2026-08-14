@@ -115,6 +115,18 @@ curl http://localhost:3031/api/health
 
 **Astral Relay must have access to your Astro site to export content.**
 
+Mount the **repository root**, and point `WORKSPACE_PATH` at the Astro root
+inside it. For a single-app repo those are the same directory; for a monorepo
+they are not:
+
+```bash
+HOST_WORKSPACE_PATH=/home/you/code/your-site   # repo root -- where .git lives
+WORKSPACE_PATH=/workspace/apps/site            # Astro root inside the mount
+```
+
+Mounting the Astro directory alone leaves `.git` outside the container, and
+every git operation fails with `not a git repository`.
+
 ### Verify Your Workspace
 
 ```bash
@@ -195,6 +207,54 @@ Only the five keys above are rewritten. Anything else already in the file —
 is carried through untouched, so a richer Astro schema survives a publish. If the
 existing frontmatter is not valid YAML, the publish fails rather than replacing
 the file.
+
+## Publishing to a statically hosted site
+
+Writing files into the workspace is enough when the site is built from that same
+machine. When the host builds from a git branch instead — Cloudflare Pages,
+Netlify, Vercel — the files have to reach that branch, or publishing changes
+nothing anyone can see.
+
+Turn on git sync and point it at the branch your host builds:
+
+```bash
+GIT_SYNC_ENABLED=true
+GIT_BRANCH=production
+HOST_GIT_SSH_KEY_PATH=/home/you/.ssh/site-publish   # deploy key, write access
+```
+
+Publishing then stages `src/content/` and `public/media/`, commits, and pushes.
+Unpublishing does the same, so a deleted post leaves the branch as well.
+
+### Use a dedicated checkout
+
+Give publishing its own clone, kept on the publish branch:
+
+```bash
+git clone --branch production git@github.com:you/your-site.git ~/code/your-site-publish
+```
+
+Pointing it at a tree you also develop in means the CMS commits onto whatever
+branch you last checked out — publishing to `some-feature` because that is what
+was open at the time. A dedicated clone has one branch and no opinions.
+
+### Credentials
+
+Use a **deploy key scoped to the site repository**, not a personal key, and mount
+it read-only. The container needs to read it and never to change it. Anything
+broader gives the CMS push rights to everything that key can reach.
+
+The uid running the container must own the mounts (`HOST_UID`/`HOST_GID`) — git
+refuses a repository owned by someone else, and files written as root cannot be
+edited afterwards without `sudo`.
+
+### When a push fails
+
+If the remote moved since the last publish, the push is rejected; Astral Relay
+fetches, rebases and retries once. If it still fails, the post remains published
+here and the failure is returned in the publish response as
+`sync: { synced: false, error: ... }` and logged. The file is written either way
+— what failed is delivery, not the publish.
 
 ## Migrating an existing Astro site
 
@@ -412,12 +472,13 @@ Configuration is via environment variables (see `.env.example`):
 |----------|---------|-------------|
 | `PORT` | `3031` | Server port |
 | `DB_PATH` | `./data/relay.db` | SQLite database path |
-| `WORKSPACE_PATH` | `/workspace` | Mounted Astro repo path |
+| `WORKSPACE_PATH` | `/workspace` | Astro root inside the mount |
 | `SESSION_SECRET` | (random) | Cookie signing secret |
 | `SESSION_MAX_AGE` | `604800000` | Session TTL (7 days) |
 | `MAX_UPLOAD_SIZE` | `10485760` | Max upload size (10MB) |
-| `GIT_SYNC_ENABLED` | `false` | Auto-commit on publish |
-| `GIT_BRANCH` | `main` | Git branch for sync |
+| `GIT_SYNC_ENABLED` | `false` | Commit and push on publish |
+| `GIT_BRANCH` | `main` | Branch to publish to |
+| `GIT_SSH_KEY_PATH` | (empty) | Deploy key used to push |
 | `WEBHOOK_URL` | (empty) | Webhook URL on publish |
 | `LOG_LEVEL` | `info` | Pino log level |
 

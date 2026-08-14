@@ -24,6 +24,10 @@ const config = {
 
   gitSyncEnabled: process.env.GIT_SYNC_ENABLED === 'true',
   gitBranch: process.env.GIT_BRANCH || 'main',
+  // Private key used to push the publishing checkout. Empty means "use whatever
+  // credentials git already has", which is right for a local workspace and
+  // wrong for the container, where there are none.
+  gitSshKeyPath: process.env.GIT_SSH_KEY_PATH || '',
 
   webhookUrl: process.env.WEBHOOK_URL || '',
   webhookTimeout: parseInt(process.env.WEBHOOK_TIMEOUT || '5000', 10),
