@@ -1,6 +1,9 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache git sqlite
+# openssh-client is needed by git for an SSH remote -- without it git sync fails
+# with "ssh: not found", reported as a generic "could not read from remote
+# repository" that looks like a credentials problem rather than a missing binary.
+RUN apk add --no-cache git sqlite openssh-client
 
 WORKDIR /app
 
